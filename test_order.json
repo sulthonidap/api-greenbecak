@@ -1,0 +1,7 @@
+{
+  "becak_code": "DRV-001",
+  "tariff_id": 1,
+  "customer_phone": "08123456789",
+  "customer_name": "Budi Santoso",
+  "notes": "Test order dari Swagger"
+}

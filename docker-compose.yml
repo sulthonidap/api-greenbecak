@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: greenbecak-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: greenbecak_db
+      MYSQL_USER: greenbecak
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - greenbecak-network
+
+  # GreenBecak Backend API
+  api:
+    build: .
+    container_name: greenbecak-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=greenbecak
+      - DB_PASSWORD=password
+      - DB_NAME=greenbecak_db
+      - JWT_SECRET=your-super-secret-jwt-key-here
+      - SERVER_PORT=8080
+      - SERVER_MODE=debug
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    depends_on:
+      - mysql
+    networks:
+      - greenbecak-network
+    volumes:
+      - .:/app
+    command: sh -c "sleep 10 && ./greenbecak-backend"
+
+  # phpMyAdmin (optional, for database management)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: greenbecak-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: greenbecak
+      PMA_PASSWORD: password
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - greenbecak-network
+
+volumes:
+  mysql_data:
+
+networks:
+  greenbecak-network:
+    driver: bridge

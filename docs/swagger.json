@@ -1,0 +1,2980 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "GreenBecak API",
+    "description": "API lengkap untuk aplikasi manajemen becak GreenBecak - Updated v2.0",
+    "version": "2.0.0",
+    "contact": {
+      "name": "GreenBecak Team",
+      "email": "support@greenbecak.com"
+    }
+  },
+  "host": "localhost:8080",
+  "basePath": "/api",
+  "schemes": ["http", "https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "JWT token dalam format: Bearer <token>"
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Endpoint untuk mengecek status API",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "API berjalan dengan baik",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "GreenBecak API is running"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Readiness Check",
+        "description": "Endpoint untuk mengecek kesiapan API (database, dependencies)",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "API siap menerima request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "ready"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Service is ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API belum siap"
+          }
+        }
+      }
+    },
+    "/live": {
+      "get": {
+        "summary": "Liveness Check",
+        "description": "Endpoint untuk mengecek apakah API masih hidup",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "API masih hidup",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "alive"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Get Metrics",
+        "description": "Mendapatkan metrics sistem",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Metrics sistem",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_requests": {"type": "integer"},
+                "successful_requests": {"type": "integer"},
+                "failed_requests": {"type": "integer"},
+                "average_response_time": {"type": "number"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/reset": {
+      "post": {
+        "summary": "Reset Metrics",
+        "description": "Reset semua metrics ke nilai awal",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Metrics berhasil direset",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Metrics reset successfully"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "summary": "Get All Alerts",
+        "description": "Mendapatkan semua alert sistem",
+        "tags": ["Alerts"],
+        "responses": {
+          "200": {
+            "description": "Daftar semua alert",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "alerts": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Alert"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Alert",
+        "description": "Membuat alert baru",
+        "tags": ["Alerts"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["info", "warning", "error", "critical"],
+                  "example": "warning"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Database connection slow"
+                },
+                "source": {
+                  "type": "string",
+                  "example": "database"
+                }
+              },
+              "required": ["type", "message"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Alert berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "alert": {"$ref": "#/definitions/Alert"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/active": {
+      "get": {
+        "summary": "Get Active Alerts",
+        "description": "Mendapatkan alert yang masih aktif",
+        "tags": ["Alerts"],
+        "responses": {
+          "200": {
+            "description": "Daftar alert aktif",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "alerts": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Alert"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/{id}/acknowledge": {
+      "put": {
+        "summary": "Acknowledge Alert",
+        "description": "Menandai alert sebagai diakui",
+        "tags": ["Alerts"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Alert ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert berhasil diakui",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "alert": {"$ref": "#/definitions/Alert"}
+              }
+            }
+          },
+          "404": {
+            "description": "Alert tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/alerts/old": {
+      "delete": {
+        "summary": "Clear Old Alerts",
+        "description": "Menghapus alert lama (lebih dari 30 hari)",
+        "tags": ["Alerts"],
+        "responses": {
+          "200": {
+            "description": "Alert lama berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Old alerts cleared successfully"
+                },
+                "deleted_count": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login User",
+        "description": "Login untuk customer, admin, atau driver",
+        "tags": ["Authentication"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "example": "user@example.com"
+                },
+                "password": {
+                  "type": "string",
+                  "example": "password123"
+                }
+              },
+              "required": ["username", "password"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login berhasil",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string"
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "username": {"type": "string"},
+                    "name": {"type": "string"},
+                    "role": {"type": "string"}
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Login successful"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Kredensial salah"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register Customer",
+        "description": "Registrasi customer baru",
+        "tags": ["Authentication"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "example": "newuser"
+                },
+                "email": {
+                  "type": "string",
+                  "example": "user@example.com"
+                },
+                "password": {
+                  "type": "string",
+                  "example": "password123"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "John Doe"
+                },
+                "phone": {
+                  "type": "string",
+                  "example": "08123456789"
+                },
+                "address": {
+                  "type": "string",
+                  "example": "Jl. Malioboro No. 1"
+                }
+              },
+              "required": ["username", "email", "password", "name"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Registrasi berhasil"
+          },
+          "409": {
+            "description": "Username atau email sudah ada"
+          }
+        }
+      }
+    },
+    "/profile": {
+      "get": {
+        "summary": "Get User Profile",
+        "description": "Mendapatkan profil user yang sedang login",
+        "tags": ["User"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Profil user",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {"$ref": "#/definitions/User"},
+                "driver": {"$ref": "#/definitions/Driver"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/orders/public": {
+      "post": {
+        "summary": "Create Public Order",
+        "description": "Buat order baru untuk customer tanpa akun (menggunakan kode becak dari sticker)",
+        "tags": ["Orders"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "becak_code": {
+                  "type": "string",
+                  "example": "DRV-001",
+                  "description": "Kode becak dari sticker barcode"
+                },
+                "tariff_id": {
+                  "type": "integer",
+                  "example": 1,
+                  "description": "ID tarif yang dipilih"
+                },
+                "customer_phone": {
+                  "type": "string",
+                  "example": "08123456789",
+                  "description": "Nomor WhatsApp customer"
+                },
+                "customer_name": {
+                  "type": "string",
+                  "example": "Budi Santoso",
+                  "description": "Nama customer (opsional)"
+                },
+                "notes": {
+                  "type": "string",
+                  "example": "Tolong hati-hati ya pak",
+                  "description": "Catatan tambahan (opsional)"
+                }
+              },
+              "required": ["becak_code", "tariff_id", "customer_phone"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Order berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Order created successfully"
+                },
+                "order": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "order_number": {"type": "string"},
+                    "becak_code": {"type": "string"},
+                    "price": {"type": "number"},
+                    "status": {"type": "string"},
+                    "customer_phone": {"type": "string"},
+                    "customer_name": {"type": "string"}
+                  }
+                },
+                "driver": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "phone": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Data tidak valid"
+          },
+          "404": {
+            "description": "Kode becak atau tarif tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/orders/history": {
+      "get": {
+        "summary": "Get Order History",
+        "description": "Ambil riwayat order berdasarkan nomor telepon customer (public)",
+        "tags": ["Orders"],
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Nomor telepon customer"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1,
+            "description": "Nomor halaman"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10,
+            "description": "Jumlah item per halaman"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Riwayat order customer",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "orders": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {"type": "integer"},
+                      "order_number": {"type": "string"},
+                      "pickup_location": {"type": "string"},
+                      "drop_location": {"type": "string"},
+                      "price": {"type": "number"},
+                      "status": {"type": "string"},
+                      "created_at": {"type": "string"}
+                    }
+                  }
+                },
+                "pagination": {
+                  "type": "object",
+                  "properties": {
+                    "page": {"type": "integer"},
+                    "limit": {"type": "integer"},
+                    "total": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nomor telepon wajib diisi"
+          }
+        }
+      }
+    },
+    "/tariffs/public": {
+      "get": {
+        "summary": "Get Public Tariffs",
+        "description": "Mendapatkan daftar tarif aktif (public - tidak perlu login)",
+        "tags": ["Tariffs"],
+        "responses": {
+          "200": {
+            "description": "Daftar tarif aktif",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tariffs": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Tariff"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tariffs/public/{id}": {
+      "get": {
+        "summary": "Get Public Tariff by ID",
+        "description": "Mendapatkan detail tarif berdasarkan ID (public)",
+        "tags": ["Tariffs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Tariff ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail tarif",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tariff": {"$ref": "#/definitions/Tariff"}
+              }
+            }
+          },
+          "404": {
+            "description": "Tarif tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/driver/{driver_id}/orders": {
+      "get": {
+        "summary": "Get Orders by Driver ID (Public)",
+        "description": "Mendapatkan orders berdasarkan driver ID (public endpoint untuk testing)",
+        "tags": ["Debug"],
+        "parameters": [
+          {
+            "name": "driver_id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar orders driver",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "orders": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Order"}
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/debug/orders": {
+      "get": {
+        "summary": "Debug All Orders",
+        "description": "Mendapatkan semua orders (debug endpoint)",
+        "tags": ["Debug"],
+        "responses": {
+          "200": {
+            "description": "Semua orders",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "orders": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Order"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/drivers": {
+      "get": {
+        "summary": "Debug All Drivers",
+        "description": "Mendapatkan semua drivers (debug endpoint)",
+        "tags": ["Debug"],
+        "responses": {
+          "200": {
+            "description": "Semua drivers",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "drivers": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Driver"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/driver/user/{user_id}": {
+      "get": {
+        "summary": "Debug Driver by User ID",
+        "description": "Mendapatkan driver berdasarkan user ID (debug endpoint)",
+        "tags": ["Debug"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Driver data",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver": {"$ref": "#/definitions/Driver"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "summary": "Create Order",
+        "description": "Buat order baru (Customer dengan akun)",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "tariff_id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "pickup_location": {
+                  "type": "string",
+                  "example": "Malioboro"
+                },
+                "drop_location": {
+                  "type": "string",
+                  "example": "Tugu Jogja"
+                },
+                "distance": {
+                  "type": "number",
+                  "example": 2.5
+                },
+                "customer_phone": {
+                  "type": "string",
+                  "example": "08123456789"
+                },
+                "customer_name": {
+                  "type": "string",
+                  "example": "John Doe"
+                },
+                "notes": {
+                  "type": "string",
+                  "example": "Tolong hati-hati"
+                }
+              },
+              "required": ["customer_id", "tariff_id", "pickup_location", "drop_location", "distance"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Order berhasil dibuat"
+          },
+          "400": {
+            "description": "Data tidak valid"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Orders",
+        "description": "Ambil daftar orders (filtered by role)",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "accepted", "completed", "cancelled"],
+            "description": "Filter by order status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar orders"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "summary": "Get Order Detail",
+        "description": "Ambil detail order berdasarkan ID",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail order"
+          },
+          "404": {
+            "description": "Order tidak ditemukan"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Order",
+        "description": "Update status order",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "accepted", "completed", "cancelled"],
+                  "example": "accepted"
+                }
+              },
+              "required": ["status"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order berhasil diupdate"
+          },
+          "404": {
+            "description": "Order tidak ditemukan"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Order",
+        "description": "Hapus order berdasarkan ID",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Order deleted successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/orders/{id}/location": {
+      "put": {
+        "summary": "Update Order Location",
+        "description": "Update lokasi pickup dan drop order (Driver)",
+        "tags": ["Orders"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "pickup_location": {
+                  "type": "string",
+                  "example": "Jl. Malioboro No. 10",
+                  "description": "Lokasi penjemputan"
+                },
+                "drop_location": {
+                  "type": "string",
+                  "example": "Tugu Jogja",
+                  "description": "Lokasi tujuan"
+                },
+                "distance": {
+                  "type": "number",
+                  "example": 2.5,
+                  "description": "Jarak dalam km"
+                }
+              },
+              "required": ["pickup_location", "drop_location", "distance"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lokasi order berhasil diupdate"
+          },
+          "400": {
+            "description": "Data tidak valid"
+          },
+          "404": {
+            "description": "Order tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "summary": "Create Payment",
+        "description": "Buat pembayaran baru",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "amount": {
+                  "type": "number",
+                  "example": 25000
+                },
+                "payment_method": {
+                  "type": "string",
+                  "enum": ["cash", "transfer", "qris"],
+                  "example": "cash"
+                },
+                "payment_details": {
+                  "type": "object",
+                  "description": "Detail pembayaran sesuai metode"
+                }
+              },
+              "required": ["order_id", "amount", "payment_method"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Pembayaran berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "payment": {"$ref": "#/definitions/Payment"}
+              }
+            }
+          },
+          "400": {
+            "description": "Data tidak valid"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Payments",
+        "description": "Mendapatkan daftar pembayaran",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "paid", "failed", "cancelled"],
+            "description": "Filter by payment status"
+          },
+          {
+            "name": "payment_method",
+            "in": "query",
+            "type": "string",
+            "enum": ["cash", "transfer", "qris"],
+            "description": "Filter by payment method"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar pembayaran",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "payments": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Payment"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "summary": "Get Payment by ID",
+        "description": "Mendapatkan detail pembayaran berdasarkan ID",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Payment ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail pembayaran",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "payment": {"$ref": "#/definitions/Payment"}
+              }
+            }
+          },
+          "404": {
+            "description": "Pembayaran tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/payments/{id}/status": {
+      "put": {
+        "summary": "Update Payment Status",
+        "description": "Update status pembayaran",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Payment ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "paid", "failed", "cancelled"],
+                  "example": "paid"
+                },
+                "notes": {
+                  "type": "string",
+                  "example": "Pembayaran diterima"
+                }
+              },
+              "required": ["status"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status pembayaran berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "payment": {"$ref": "#/definitions/Payment"}
+              }
+            }
+          },
+          "404": {
+            "description": "Pembayaran tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/payments/{id}/process": {
+      "post": {
+        "summary": "Process Payment",
+        "description": "Proses pembayaran (untuk admin)",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Payment ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pembayaran berhasil diproses",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "payment": {"$ref": "#/definitions/Payment"}
+              }
+            }
+          },
+          "404": {
+            "description": "Pembayaran tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/payments/stats": {
+      "get": {
+        "summary": "Get Payment Statistics",
+        "description": "Mendapatkan statistik pembayaran",
+        "tags": ["Payments"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Statistik pembayaran",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_payments": {"type": "integer"},
+                "total_amount": {"type": "number"},
+                "pending_payments": {"type": "integer"},
+                "paid_payments": {"type": "integer"},
+                "failed_payments": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/driver/withdrawals": {
+      "post": {
+        "summary": "Create Withdrawal Request",
+        "description": "Driver membuat permintaan penarikan dana",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateWithdrawalRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Withdrawal request created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "withdrawal": {"$ref": "#/definitions/Withdrawal"}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or insufficient balance"
+          },
+          "404": {
+            "description": "Driver not found"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Driver Withdrawals",
+        "description": "Mendapatkan riwayat penarikan driver",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "description": "Filter by status (pending, approved, completed)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of withdrawals",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "withdrawals": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Withdrawal"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/driver/location": {
+      "post": {
+        "summary": "Update Driver Location",
+        "description": "Update lokasi driver secara real-time",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LocationUpdate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Location updated successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "location": {"$ref": "#/definitions/DriverLocation"}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid coordinates"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Driver Location",
+        "description": "Mendapatkan lokasi driver saat ini",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Driver location",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "location": {"$ref": "#/definitions/DriverLocation"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver location not found"
+          }
+        }
+      }
+    },
+    "/driver/location/history": {
+      "get": {
+        "summary": "Get Driver Location History",
+        "description": "Mendapatkan riwayat lokasi driver",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "description": "Number of records to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Location history",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "locations": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/DriverLocation"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/driver/online-status": {
+      "put": {
+        "summary": "Set Driver Online Status",
+        "description": "Set status online/offline driver",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "is_online": {
+                  "type": "boolean",
+                  "example": true
+                }
+              },
+              "required": ["is_online"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Online status updated successfully"
+          }
+        }
+      }
+    },
+    "/location/drivers/nearby": {
+      "get": {
+        "summary": "Get Nearby Drivers",
+        "description": "Mendapatkan daftar driver terdekat",
+        "tags": ["Location"],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Latitude"
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Longitude"
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "type": "number",
+            "description": "Radius dalam kilometer",
+            "default": 5
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of nearby drivers",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "drivers": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/NearbyDriver"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/location/drivers/{id}": {
+      "get": {
+        "summary": "Get Driver Location by ID",
+        "description": "Mendapatkan lokasi driver berdasarkan ID",
+        "tags": ["Location"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Driver location",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "location": {"$ref": "#/definitions/DriverLocation"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver location not found"
+          }
+        }
+      }
+    },
+    "/location/routes/{order_id}": {
+      "get": {
+        "summary": "Get Route for Order",
+        "description": "Mendapatkan rute untuk order tertentu",
+        "tags": ["Location"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Route information",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver_location": {
+                  "type": "object",
+                  "properties": {
+                    "latitude": {"type": "number"},
+                    "longitude": {"type": "number"}
+                  }
+                },
+                "pickup_location": {"type": "string"},
+                "drop_location": {"type": "string"},
+                "route": {"type": "object"}
+              }
+            }
+          },
+          "404": {
+            "description": "Order or driver location not found"
+          }
+        }
+      }
+    },
+    "/admin/withdrawals": {
+      "get": {
+        "summary": "Get All Withdrawals",
+        "description": "Admin melihat semua permintaan penarikan",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "description": "Filter by status"
+          },
+          {
+            "name": "driver_id",
+            "in": "query",
+            "type": "integer",
+            "description": "Filter by driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all withdrawals",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "withdrawals": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Withdrawal"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/withdrawals/{id}": {
+      "get": {
+        "summary": "Get Withdrawal by ID",
+        "description": "Admin melihat detail penarikan",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Withdrawal ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Withdrawal details",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "withdrawal": {"$ref": "#/definitions/Withdrawal"}
+              }
+            }
+          },
+          "404": {
+            "description": "Withdrawal not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Withdrawal Status",
+        "description": "Admin mengubah status penarikan",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Withdrawal ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateWithdrawalRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Withdrawal updated successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "withdrawal": {"$ref": "#/definitions/Withdrawal"}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Withdrawal not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Withdrawal",
+        "description": "Admin menghapus penarikan",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Withdrawal ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Withdrawal deleted successfully"
+          },
+          "404": {
+            "description": "Withdrawal not found"
+          }
+        }
+      }
+    },
+    "/tariffs": {
+      "get": {
+        "summary": "Get Tariffs",
+        "description": "Ambil daftar tarif aktif",
+        "tags": ["Tariffs"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "is_active",
+            "in": "query",
+            "type": "boolean",
+            "description": "Filter by active status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar tarif"
+          }
+        }
+      }
+    },
+    "/tariffs/{id}": {
+      "get": {
+        "summary": "Get Tariff by ID",
+        "description": "Mendapatkan detail tarif berdasarkan ID",
+        "tags": ["Tariffs"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Tariff ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail tarif",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tariff": {"$ref": "#/definitions/Tariff"}
+              }
+            }
+          },
+          "404": {
+            "description": "Tarif tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "post": {
+        "summary": "Create User (Admin)",
+        "description": "Buat user baru (Admin only). Jika role = 'driver', otomatis akan membuat record driver juga.",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "example": "john_doe"
+                },
+                "email": {
+                  "type": "string",
+                  "example": "john@example.com"
+                },
+                "password": {
+                  "type": "string",
+                  "example": "password123"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "John Doe"
+                },
+                "phone": {
+                  "type": "string",
+                  "example": "08123456789"
+                },
+                "address": {
+                  "type": "string",
+                  "example": "Jl. Malioboro No. 1"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["admin", "customer", "driver"],
+                  "example": "customer"
+                },
+                "driver_code": {
+                  "type": "string",
+                  "example": "DRV-001",
+                  "description": "Required if role = 'driver'"
+                },
+                "id_card": {
+                  "type": "string",
+                  "example": "1234567890123456",
+                  "description": "Required if role = 'driver'"
+                },
+                
+                "vehicle_number": {
+                  "type": "string",
+                  "example": "AB 1234 XX",
+                  "description": "Required if role = 'driver'"
+                }
+              },
+              "required": ["username", "email", "password", "name", "role"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "User created successfully"
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "username": {"type": "string"},
+                    "email": {"type": "string"},
+                    "role": {"type": "string"},
+                    "name": {"type": "string"},
+                    "phone": {"type": "string"},
+                    "address": {"type": "string"},
+                    "is_active": {"type": "boolean"}
+                  }
+                },
+                "driver": {
+                  "type": "object",
+                  "description": "Only present if role = 'driver'",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "user_id": {"type": "integer"},
+                    "driver_code": {"type": "string"},
+                    "name": {"type": "string"},
+                    "phone": {"type": "string"},
+                    "email": {"type": "string"},
+                    "address": {"type": "string"},
+                    "id_card": {"type": "string"},
+                    "license_number": {"type": "string"},
+                    "vehicle_number": {"type": "string"},
+                    "status": {"type": "string"},
+                    "is_active": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Data tidak valid"
+          },
+          "409": {
+            "description": "Username atau email sudah ada"
+          },
+          "403": {
+            "description": "Akses ditolak"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Users (Admin)",
+        "description": "Ambil daftar users (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "type": "string",
+            "enum": ["admin", "customer", "driver"],
+            "description": "Filter by user role"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "type": "boolean",
+            "description": "Filter by active status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar users"
+          },
+          "403": {
+            "description": "Akses ditolak"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "summary": "Get User by ID (Admin)",
+        "description": "Mendapatkan detail user berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail user",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {"$ref": "#/definitions/User"}
+              }
+            }
+          },
+          "404": {
+            "description": "User tidak ditemukan"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update User (Admin)",
+        "description": "Update user berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "User ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "email": {"type": "string"},
+                "phone": {"type": "string"},
+                "address": {"type": "string"},
+                "is_active": {"type": "boolean"}
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "user": {"$ref": "#/definitions/User"}
+              }
+            }
+          },
+          "404": {
+            "description": "User tidak ditemukan"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete User (Admin)",
+        "description": "Hapus user berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "User deleted successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/admin/drivers": {
+      "post": {
+        "summary": "Create Driver (Admin)",
+        "description": "Buat driver baru (Admin only). Email akan otomatis dibuat dengan format driver_code@drivers.local",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver_code": {
+                  "type": "string",
+                  "example": "DRV001"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "Budi Santoso"
+                },
+                "phone": {
+                  "type": "string",
+                  "example": "08123456789"
+                },
+                "address": {
+                  "type": "string",
+                  "example": "Jl. Malioboro No. 2"
+                },
+                "id_card": {
+                  "type": "string",
+                  "example": "1234567890123456"
+                },
+                
+                "vehicle_number": {
+                  "type": "string",
+                  "example": "AB1234CD"
+                }
+              },
+              "required": ["driver_code", "name", "phone"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Driver berhasil dibuat"
+          },
+          "409": {
+            "description": "Driver code sudah ada"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Drivers (Admin)",
+        "description": "Ambil daftar drivers (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "enum": ["active", "inactive", "on_trip"],
+            "description": "Filter by driver status"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "type": "boolean",
+            "description": "Filter by active status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar drivers"
+          }
+        }
+      }
+    },
+    "/admin/drivers/{id}": {
+      "get": {
+        "summary": "Get Driver by ID (Admin)",
+        "description": "Mendapatkan detail driver berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail driver",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver": {"$ref": "#/definitions/Driver"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Driver (Admin)",
+        "description": "Update driver berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "phone": {"type": "string"},
+                "email": {"type": "string"},
+                "address": {"type": "string"},
+                "id_card": {"type": "string"},
+                "vehicle_number": {"type": "string"},
+                "status": {
+                  "type": "string",
+                  "enum": ["active", "inactive", "on_trip"]
+                },
+                "is_active": {"type": "boolean"}
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Driver berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "driver": {"$ref": "#/definitions/Driver"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Driver (Admin)",
+        "description": "Hapus driver berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Driver berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Driver deleted successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/admin/drivers/{id}/performance": {
+      "get": {
+        "summary": "Get Driver Performance (Admin)",
+        "description": "Mendapatkan performa driver berdasarkan ID (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Driver ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Driver performance data",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_orders": {"type": "integer"},
+                "completed_orders": {"type": "integer"},
+                "cancelled_orders": {"type": "integer"},
+                "total_earnings": {"type": "number"},
+                "average_rating": {"type": "number"},
+                "performance_score": {"type": "number"}
+              }
+            }
+          },
+          "404": {
+            "description": "Driver tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/admin/drivers/financial-data": {
+      "get": {
+        "summary": "Get Driver Financial Data (Admin)",
+        "description": "Mendapatkan data keuangan semua driver (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Driver financial data",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "drivers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "driver_id": {"type": "integer"},
+                      "driver_name": {"type": "string"},
+                      "total_earnings": {"type": "number"},
+                      "total_withdrawals": {"type": "number"},
+                      "current_balance": {"type": "number"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/analytics": {
+      "get": {
+        "summary": "Get Analytics (Admin)",
+        "description": "Dashboard analytics (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Analytics data"
+          }
+        }
+      }
+    },
+    "/admin/analytics/revenue": {
+      "get": {
+        "summary": "Get Revenue Analytics (Admin)",
+        "description": "Analitik pendapatan (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Revenue analytics data",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_revenue": {"type": "number"},
+                "monthly_revenue": {"type": "array"},
+                "daily_revenue": {"type": "array"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/analytics/orders": {
+      "get": {
+        "summary": "Get Order Analytics (Admin)",
+        "description": "Analitik order (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Order analytics data",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_orders": {"type": "integer"},
+                "completed_orders": {"type": "integer"},
+                "pending_orders": {"type": "integer"},
+                "cancelled_orders": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/tariffs": {
+      "post": {
+        "summary": "Create Tariff (Admin)",
+        "description": "Buat tarif baru (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "example": "Jarak Dekat"
+                },
+                "min_distance": {
+                  "type": "number",
+                  "example": 0
+                },
+                "max_distance": {
+                  "type": "number",
+                  "example": 3
+                },
+                "price": {
+                  "type": "number",
+                  "example": 10000
+                },
+                "destinations": {
+                  "type": "string",
+                  "example": "Malioboro, Tugu, Stasiun Tugu"
+                }
+              },
+              "required": ["name", "min_distance", "max_distance", "price"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Tarif berhasil dibuat"
+          }
+        }
+      }
+    },
+    "/admin/tariffs/{id}": {
+      "put": {
+        "summary": "Update Tariff (Admin)",
+        "description": "Update tarif (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Tariff ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "example": "Jarak Dekat Updated"
+                },
+                "min_distance": {
+                  "type": "number",
+                  "example": 0
+                },
+                "max_distance": {
+                  "type": "number",
+                  "example": 5
+                },
+                "price": {
+                  "type": "number",
+                  "example": 15000
+                },
+                "destinations": {
+                  "type": "string",
+                  "example": "Malioboro, Tugu, Stasiun Tugu, Kraton"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tarif berhasil diupdate"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Tariff (Admin)",
+        "description": "Delete tarif (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Tariff ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tarif berhasil dihapus"
+          }
+        }
+      }
+    },
+    "/admin/tariffs/{id}/active": {
+      "put": {
+        "summary": "Toggle Tariff Active Status (Admin)",
+        "description": "Aktifkan/nonaktifkan tarif (Admin only)",
+        "tags": ["Admin"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Tariff ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "is_active": {
+                  "type": "boolean",
+                  "example": true,
+                  "description": "Set to true to activate, false to deactivate"
+                }
+              },
+              "required": ["is_active"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status tarif berhasil diubah"
+          }
+        }
+      }
+    },
+    "/driver/orders": {
+      "get": {
+        "summary": "Get Driver Orders",
+        "description": "Ambil orders untuk driver (Driver only)",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "accepted", "completed", "cancelled"],
+            "description": "Filter by order status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar orders driver"
+          }
+        }
+      }
+    },
+    "/driver/orders/{id}/accept": {
+      "put": {
+        "summary": "Accept Order (Driver)",
+        "description": "Accept order (Driver only)",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order berhasil diaccept"
+          },
+          "400": {
+            "description": "Order tidak tersedia"
+          }
+        }
+      }
+    },
+    "/driver/earnings": {
+      "get": {
+        "summary": "Get Driver Earnings",
+        "description": "Lihat earnings driver (Driver only)",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Earnings data"
+          }
+        }
+      }
+    },
+    "/driver/orders/{id}/complete": {
+      "put": {
+        "summary": "Complete Order (Driver)",
+        "description": "Selesaikan order (Driver only)",
+        "tags": ["Driver"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order berhasil diselesaikan",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "order": {"$ref": "#/definitions/Order"}
+              }
+            }
+          },
+          "400": {
+            "description": "Order tidak dapat diselesaikan"
+          },
+          "404": {
+            "description": "Order tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "Get Notifications",
+        "description": "Mendapatkan daftar notifikasi user",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "is_read",
+            "in": "query",
+            "type": "boolean",
+            "description": "Filter by read status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar notifikasi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "notifications": {
+                  "type": "array",
+                  "items": {"$ref": "#/definitions/Notification"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Notification (Admin)",
+        "description": "Buat notifikasi baru (Admin only)",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "title": {
+                  "type": "string",
+                  "example": "Order Selesai"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Order Anda telah selesai"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["info", "success", "warning", "error"],
+                  "example": "success"
+                }
+              },
+              "required": ["user_id", "title", "message"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Notifikasi berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "notification": {"$ref": "#/definitions/Notification"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/bulk": {
+      "post": {
+        "summary": "Send Bulk Notification (Admin)",
+        "description": "Kirim notifikasi ke banyak user (Admin only)",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user_ids": {
+                  "type": "array",
+                  "items": {"type": "integer"},
+                  "example": [1, 2, 3]
+                },
+                "title": {
+                  "type": "string",
+                  "example": "Maintenance"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Sistem akan maintenance"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["info", "success", "warning", "error"],
+                  "example": "warning"
+                }
+              },
+              "required": ["user_ids", "title", "message"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Notifikasi berhasil dikirim",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "sent_count": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{id}": {
+      "get": {
+        "summary": "Get Notification by ID",
+        "description": "Mendapatkan detail notifikasi berdasarkan ID",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail notifikasi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "notification": {"$ref": "#/definitions/Notification"}
+              }
+            }
+          },
+          "404": {
+            "description": "Notifikasi tidak ditemukan"
+          }
+        }
+      },
+      "put": {
+        "summary": "Mark Notification as Read",
+        "description": "Tandai notifikasi sebagai sudah dibaca",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifikasi berhasil ditandai sebagai dibaca",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "notification": {"$ref": "#/definitions/Notification"}
+              }
+            }
+          },
+          "404": {
+            "description": "Notifikasi tidak ditemukan"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Notification",
+        "description": "Hapus notifikasi",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifikasi berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Notification deleted successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifikasi tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "put": {
+        "summary": "Mark All Notifications as Read",
+        "description": "Tandai semua notifikasi sebagai sudah dibaca",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Semua notifikasi berhasil ditandai sebagai dibaca",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "All notifications marked as read"
+                },
+                "updated_count": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/stats": {
+      "get": {
+        "summary": "Get Notification Statistics",
+        "description": "Mendapatkan statistik notifikasi",
+        "tags": ["Notifications"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Statistik notifikasi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "total_notifications": {"type": "integer"},
+                "unread_notifications": {"type": "integer"},
+                "read_notifications": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "username": {"type": "string"},
+        "email": {"type": "string"},
+        "name": {"type": "string"},
+        "role": {"type": "string", "enum": ["admin", "customer"]},
+        "phone": {"type": "string"},
+        "address": {"type": "string"},
+        "is_active": {"type": "boolean"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "Driver": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "driver_code": {"type": "string"},
+        "name": {"type": "string"},
+        "phone": {"type": "string"},
+        "email": {"type": "string"},
+        "address": {"type": "string"},
+        "id_card": {"type": "string"},
+        "license_number": {"type": "string"},
+        "vehicle_number": {"type": "string"},
+        "status": {"type": "string", "enum": ["active", "inactive", "on_trip"]},
+        "rating": {"type": "number"},
+        "total_trips": {"type": "integer"},
+        "total_earnings": {"type": "number"},
+        "is_active": {"type": "boolean"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "order_number": {"type": "string"},
+        "customer_id": {"type": "integer"},
+        "driver_id": {"type": "integer"},
+        "tariff_id": {"type": "integer"},
+        "pickup_location": {"type": "string"},
+        "drop_location": {"type": "string"},
+        "distance": {"type": "number"},
+        "price": {"type": "number"},
+        "status": {"type": "string", "enum": ["pending", "accepted", "completed", "cancelled"]},
+        "payment_status": {"type": "string"},
+        "customer_phone": {"type": "string"},
+        "customer_name": {"type": "string"},
+        "notes": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "Tariff": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "min_distance": {"type": "number"},
+        "max_distance": {"type": "number"},
+        "price": {"type": "number"},
+        "destinations": {"type": "string"},
+        "is_active": {"type": "boolean"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "Withdrawal": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "driver_id": {"type": "integer"},
+        "amount": {"type": "number"},
+        "status": {"type": "string", "enum": ["pending", "approved", "completed", "rejected"]},
+        "bank_name": {"type": "string"},
+        "account_number": {"type": "string"},
+        "account_name": {"type": "string"},
+        "notes": {"type": "string"},
+        "approved_at": {"type": "string", "format": "date-time"},
+        "completed_at": {"type": "string", "format": "date-time"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "driver": {"$ref": "#/definitions/Driver"}
+      }
+    },
+    "CreateWithdrawalRequest": {
+      "type": "object",
+      "properties": {
+        "amount": {"type": "number", "example": 50000},
+        "bank_name": {"type": "string", "example": "BCA"},
+        "account_number": {"type": "string", "example": "1234567890"},
+        "account_name": {"type": "string", "example": "John Doe"},
+        "notes": {"type": "string", "example": "Penarikan untuk kebutuhan keluarga"}
+      },
+      "required": ["amount", "bank_name", "account_number", "account_name"]
+    },
+    "UpdateWithdrawalRequest": {
+      "type": "object",
+      "properties": {
+        "status": {"type": "string", "enum": ["pending", "approved", "completed", "rejected"]},
+        "notes": {"type": "string", "example": "Penarikan disetujui"}
+      },
+      "required": ["status"]
+    },
+    "DriverLocation": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "driver_id": {"type": "integer"},
+        "latitude": {"type": "number", "example": -7.797068},
+        "longitude": {"type": "number", "example": 110.370529},
+        "accuracy": {"type": "number", "example": 10.5},
+        "speed": {"type": "number", "example": 25.0},
+        "heading": {"type": "number", "example": 90.0},
+        "is_online": {"type": "boolean"},
+        "last_seen": {"type": "string", "format": "date-time"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "LocationUpdate": {
+      "type": "object",
+      "properties": {
+        "latitude": {"type": "number", "example": -7.797068},
+        "longitude": {"type": "number", "example": 110.370529},
+        "accuracy": {"type": "number", "example": 10.5},
+        "speed": {"type": "number", "example": 25.0},
+        "heading": {"type": "number", "example": 90.0},
+        "timestamp": {"type": "string", "format": "date-time"}
+      },
+      "required": ["latitude", "longitude"]
+    },
+    "NearbyDriver": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "latitude": {"type": "number"},
+        "longitude": {"type": "number"},
+        "distance": {"type": "number"},
+        "is_online": {"type": "boolean"},
+        "rating": {"type": "number"},
+        "vehicle_type": {"type": "string"}
+      }
+    },
+    "Payment": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "order_id": {"type": "integer"},
+        "amount": {"type": "number"},
+        "payment_method": {"type": "string", "enum": ["cash", "transfer", "qris"]},
+        "payment_details": {"type": "object"},
+        "status": {"type": "string", "enum": ["pending", "paid", "failed", "cancelled"]},
+        "notes": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "order": {"$ref": "#/definitions/Order"}
+      }
+    },
+    "Notification": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "user_id": {"type": "integer"},
+        "title": {"type": "string"},
+        "message": {"type": "string"},
+        "type": {"type": "string", "enum": ["info", "success", "warning", "error"]},
+        "is_read": {"type": "boolean"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "user": {"$ref": "#/definitions/User"}
+      }
+    },
+    "Alert": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "type": {"type": "string", "enum": ["info", "warning", "error", "critical"]},
+        "message": {"type": "string"},
+        "source": {"type": "string"},
+        "is_acknowledged": {"type": "boolean"},
+        "acknowledged_at": {"type": "string", "format": "date-time"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "System",
+      "description": "System endpoints"
+    },
+    {
+      "name": "Alerts",
+      "description": "System alerts and monitoring"
+    },
+    {
+      "name": "Authentication",
+      "description": "Authentication endpoints"
+    },
+    {
+      "name": "User",
+      "description": "User profile endpoints"
+    },
+    {
+      "name": "Orders",
+      "description": "Order management endpoints"
+    },
+    {
+      "name": "Payments",
+      "description": "Payment management endpoints"
+    },
+    {
+      "name": "Notifications",
+      "description": "Notification management endpoints"
+    },
+    {
+      "name": "Tariffs",
+      "description": "Tariff management endpoints"
+    },
+    {
+      "name": "Admin",
+      "description": "Admin-only endpoints"
+    },
+    {
+      "name": "Driver",
+      "description": "Driver-specific endpoints"
+    },
+    {
+      "name": "Location",
+      "description": "Location tracking endpoints"
+    },
+    {
+      "name": "Debug",
+      "description": "Debug and testing endpoints"
+    }
+  ]
+}

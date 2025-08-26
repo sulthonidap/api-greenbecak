@@ -1,0 +1,1 @@
+JWT_SECRET=greenbecak_super_secret_jwt_key_for_authentication_2024_very_long_string

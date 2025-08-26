@@ -1,0 +1,82 @@
+# Gowatch configuration for GreenBecak Backend
+# This file configures hot reload for development
+
+# The name of the executable file to be built
+appname: greenbecak-backend
+
+# The directory where the main.go file is located
+cmd: "."
+
+# The directory where the built executable will be placed
+output: "."
+
+# The file extensions to watch for changes
+watch_exts:
+  - .go
+  - .yml
+  - .yaml
+  - .json
+  - .env
+
+# The directories to watch for changes
+watch_paths:
+  - .
+  - handlers
+  - models
+  - routes
+  - middleware
+  - database
+  - utils
+  - monitoring
+
+# The directories to ignore
+exclude_dirs:
+  - .git
+  - vendor
+  - node_modules
+  - dist
+  - build
+  - tmp
+  - temp
+
+# The files to ignore
+exclude_files:
+  - .env
+  - .env.local
+  - .env.production
+  - *.log
+  - *.tmp
+  - *.temp
+
+# The command to run before building
+pre_cmd: ""
+
+# The command to run after building
+post_cmd: ""
+
+# The arguments to pass to the built executable
+args:
+  - ""
+
+# The environment variables to set
+env:
+  - "SERVER_MODE=debug"
+  - "SERVER_PORT=8080"
+
+# Whether to show build output
+verbose: true
+
+# Whether to show file change notifications
+notify: true
+
+# The delay in milliseconds before rebuilding after file changes
+delay: 1000
+
+# Whether to kill the previous process before starting a new one
+kill_delay: 1000
+
+# Whether to use colors in output
+color: true
+
+# The log level (debug, info, warn, error)
+log_level: "info"

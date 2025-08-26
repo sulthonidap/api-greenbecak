@@ -1,0 +1,7 @@
+{
+  "becak_code": "001",
+  "tariff_id": 1,
+  "customer_phone": "081234567890",
+  "customer_name": "John Doe",
+  "notes": "Test order from public endpoint"
+}
