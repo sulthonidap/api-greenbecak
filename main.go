@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"greenbecak-backend/config"
 	"greenbecak-backend/database"
@@ -47,10 +48,29 @@ func main() {
 
 	// CORS configuration
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
+
+	// Get allowed origins from environment variable
+	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if corsOrigins == "" {
+		// Default to localhost if not set
+		corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
+	} else {
+		// Split comma-separated origins
+		origins := strings.Split(corsOrigins, ",")
+		for i, origin := range origins {
+			origins[i] = strings.TrimSpace(origin)
+		}
+		corsConfig.AllowOrigins = origins
+	}
+
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"}
 	corsConfig.AllowCredentials = true
+	corsConfig.ExposeHeaders = []string{"Content-Length", "Content-Type"}
+
+	// Log CORS configuration for debugging
+	log.Printf("CORS Allowed Origins: %v", corsConfig.AllowOrigins)
+
 	r.Use(cors.New(corsConfig))
 
 	// Add logging middleware

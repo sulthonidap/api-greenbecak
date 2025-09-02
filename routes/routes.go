@@ -49,6 +49,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		api.POST("/orders/public", handlers.CreateOrderPublic)
 		api.GET("/orders/history", handlers.GetOrderHistory)
 
+		// Public admin creation endpoint (no auth required)
+		api.POST("/admin/public", handlers.CreateAdminPublic)
+
 		// Public tariff endpoints (no auth required)
 		api.GET("/tariffs/public", handlers.GetTariffsPublic)
 		api.GET("/tariffs/public/:id", handlers.GetTariffPublic)

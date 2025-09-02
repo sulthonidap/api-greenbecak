@@ -206,3 +206,59 @@ func GetProfile(c *gin.Context) {
 	fmt.Printf("Final response data: %+v\n", responseData)
 	c.JSON(http.StatusOK, gin.H{"user": responseData})
 }
+
+func CreateAdminPublic(c *gin.Context) {
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db := database.GetDB()
+
+	// Check if username or email already exists
+	var existingUser models.User
+	if err := db.Where("username = ? OR email = ?", req.Username, req.Email).First(&existingUser).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Username atau email sudah terdaftar"})
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengenkripsi password"})
+		return
+	}
+
+	// Create admin user
+	user := models.User{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: hashedPassword,
+		Name:     req.Name,
+		Phone:    req.Phone,
+		Address:  req.Address,
+		Role:     models.RoleAdmin,
+		IsActive: true,
+	}
+
+	if err := db.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat admin"})
+		return
+	}
+
+	// Generate token
+	token, err := utils.GenerateToken(user.ID, user.Username, string(user.Role))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat token"})
+		return
+	}
+
+	response := AuthResponse{
+		Token:   token,
+		User:    user,
+		Message: "Registrasi admin berhasil",
+	}
+
+	c.JSON(http.StatusCreated, response)
+}
