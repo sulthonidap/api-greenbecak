@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"greenbecak-backend/config"
 	"greenbecak-backend/database"
@@ -29,11 +30,11 @@ func main() {
 		log.Fatal("Environment validation failed:", err)
 	}
 
-	// Initialize database
+	// Initialize database (non-blocking)
 	db := database.InitDB()
 	defer database.CloseDB()
 
-	// Initialize Firebase service
+	// Initialize Firebase service (non-blocking)
 	config.InitFirebase()
 
 	// Set Gin mode
@@ -106,6 +107,10 @@ func main() {
 			log.Fatal("Failed to start server:", err)
 		}
 	}()
+
+	// Give server time to start
+	time.Sleep(2 * time.Second)
+	log.Println("Server is ready to accept connections")
 
 	// Wait for interrupt signal to gracefully shutdown the server
 	utils.GracefulShutdown(srv)

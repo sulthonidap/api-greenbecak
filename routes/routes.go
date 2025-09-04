@@ -13,6 +13,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	r.GET("/health", handlers.HealthCheck)
 	r.GET("/ready", handlers.ReadinessCheck)
 	r.GET("/live", handlers.LivenessCheck)
+	r.GET("/database/status", handlers.DatabaseStatusCheck)
 
 	// Metrics endpoints
 	r.GET("/metrics", handlers.GetMetrics)

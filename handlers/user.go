@@ -35,124 +35,128 @@ type UpdateUserRequest struct {
 }
 
 func CreateUser(c *gin.Context) {
-	var req CreateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	db := database.GetDB()
-
-	// Check if username or email already exists
-	var existingUser models.User
-	if err := db.Where("username = ? OR email = ?", req.Username, req.Email).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
-		return
-	}
-
-	// Validate driver-specific fields if role is driver
-	if req.Role == "driver" {
-		if req.DriverCode == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Driver code is required for driver role"})
+	CheckDatabaseAndRespond(c, func(c *gin.Context) {
+		var req CreateUserRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		// Check if driver code already exists
-		var existingDriver models.Driver
-		if err := db.Where("driver_code = ?", req.DriverCode).First(&existingDriver).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Driver code already exists"})
+
+		db := database.GetDB()
+
+		// Check if username or email already exists
+		var existingUser models.User
+		if err := db.Where("username = ? OR email = ?", req.Username, req.Email).First(&existingUser).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
 			return
 		}
-	}
 
-	// Hash password
-	hashedPassword, err := utils.HashPassword(req.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
-
-	// Create user
-	user := models.User{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: hashedPassword,
-		Name:     req.Name,
-		Phone:    req.Phone,
-		Address:  req.Address,
-		Role:     models.UserRole(req.Role),
-		IsActive: true,
-	}
-
-	if err := db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-		return
-	}
-
-	// If role is driver, create driver record
-	if req.Role == "driver" {
-		// Set default vehicle type if not provided
-		vehicleType := models.VehicleTypeBecakManual
-		if req.VehicleType != "" {
-			vehicleType = models.VehicleType(req.VehicleType)
+		// Validate driver-specific fields if role is driver
+		if req.Role == "driver" {
+			if req.DriverCode == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Driver code is required for driver role"})
+				return
+			}
+			// Check if driver code already exists
+			var existingDriver models.Driver
+			if err := db.Where("driver_code = ?", req.DriverCode).First(&existingDriver).Error; err == nil {
+				c.JSON(http.StatusConflict, gin.H{"error": "Driver code already exists"})
+				return
+			}
 		}
 
-		driver := models.Driver{
-			UserID:        &user.ID,
-			DriverCode:    req.DriverCode,
-			Name:          req.Name,
-			Phone:         req.Phone,
-			Email:         req.Email,
-			Address:       req.Address,
-			IDCard:        req.IDCard,
-			VehicleNumber: req.VehicleNumber,
-			VehicleType:   vehicleType,
-			Status:        models.DriverStatusActive,
-			IsActive:      true,
+		// Hash password
+		hashedPassword, err := utils.HashPassword(req.Password)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
 		}
 
-		if err := db.Create(&driver).Error; err != nil {
-			// Rollback user creation if driver creation fails
-			db.Delete(&user)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create driver record"})
+		// Create user
+		user := models.User{
+			Username: req.Username,
+			Email:    req.Email,
+			Password: hashedPassword,
+			Name:     req.Name,
+			Phone:    req.Phone,
+			Address:  req.Address,
+			Role:     models.UserRole(req.Role),
+			IsActive: true,
+		}
+
+		if err := db.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			return
+		}
+
+		// If role is driver, create driver record
+		if req.Role == "driver" {
+			// Set default vehicle type if not provided
+			vehicleType := models.VehicleTypeBecakManual
+			if req.VehicleType != "" {
+				vehicleType = models.VehicleType(req.VehicleType)
+			}
+
+			driver := models.Driver{
+				UserID:        &user.ID,
+				DriverCode:    req.DriverCode,
+				Name:          req.Name,
+				Phone:         req.Phone,
+				Email:         req.Email,
+				Address:       req.Address,
+				IDCard:        req.IDCard,
+				VehicleNumber: req.VehicleNumber,
+				VehicleType:   vehicleType,
+				Status:        models.DriverStatusActive,
+				IsActive:      true,
+			}
+
+			if err := db.Create(&driver).Error; err != nil {
+				// Rollback user creation if driver creation fails
+				db.Delete(&user)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create driver record"})
+				return
+			}
+
+			c.JSON(http.StatusCreated, gin.H{
+				"message": "User and driver created successfully",
+				"user":    user,
+				"driver":  driver,
+			})
 			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"message": "User and driver created successfully",
+			"message": "User created successfully",
 			"user":    user,
-			"driver":  driver,
 		})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created successfully",
-		"user":    user,
 	})
 }
 
 func GetUsers(c *gin.Context) {
-	db := database.GetDB()
+	CheckDatabaseAndRespond(c, func(c *gin.Context) {
+		db := database.GetDB()
 
-	var users []models.User
-	query := db
+		var users []models.User
+		query := db
 
-	// Add filters
-	if role := c.Query("role"); role != "" {
-		query = query.Where("role = ?", role)
-	}
+		// Add filters
+		if role := c.Query("role"); role != "" {
+			query = query.Where("role = ?", role)
+		}
 
-	if isActive := c.Query("is_active"); isActive != "" {
-		active, _ := strconv.ParseBool(isActive)
-		query = query.Where("is_active = ?", active)
-	}
+		if isActive := c.Query("is_active"); isActive != "" {
+			active, _ := strconv.ParseBool(isActive)
+			query = query.Where("is_active = ?", active)
+		}
 
-	if err := query.Preload("Driver").Preload("Orders").Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
-		return
-	}
+		if err := query.Preload("Driver").Preload("Orders").Find(&users).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+			return
+		}
 
-	c.JSON(http.StatusOK, gin.H{"users": users})
+		c.JSON(http.StatusOK, gin.H{"users": users})
+	})
 }
 
 func GetUser(c *gin.Context) {

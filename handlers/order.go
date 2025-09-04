@@ -48,56 +48,58 @@ func generateOrderNumber() string {
 }
 
 func CreateOrder(c *gin.Context) {
-	var req CreateOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	CheckDatabaseAndRespond(c, func(c *gin.Context) {
+		var req CreateOrderRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-	db := database.GetDB()
+		db := database.GetDB()
 
-	// Get tariff
-	var tariff models.Tariff
-	if err := db.First(&tariff, req.TariffID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Tariff not found"})
-		return
-	}
+		// Get tariff
+		var tariff models.Tariff
+		if err := db.First(&tariff, req.TariffID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Tariff not found"})
+			return
+		}
 
-	// Calculate price based on distance range
-	var price float64
-	if req.Distance >= tariff.MinDistance && req.Distance <= tariff.MaxDistance {
-		price = tariff.Price
-	} else {
-		// If distance is outside range, use the tariff price anyway (flat pricing)
-		price = tariff.Price
-	}
+		// Calculate price based on distance range
+		var price float64
+		if req.Distance >= tariff.MinDistance && req.Distance <= tariff.MaxDistance {
+			price = tariff.Price
+		} else {
+			// If distance is outside range, use the tariff price anyway (flat pricing)
+			price = tariff.Price
+		}
 
-	order := models.Order{
-		OrderNumber:    generateOrderNumber(),
-		CustomerID:     &req.CustomerID,
-		TariffID:       req.TariffID,
-		PickupLocation: req.PickupLocation,
-		DropLocation:   req.DropLocation,
-		Distance:       req.Distance,
-		Price:          price,
-		Status:         "pending",
-		PaymentStatus:  "pending",
-		CustomerPhone:  req.CustomerPhone,
-		CustomerName:   req.CustomerName,
-		Notes:          req.Notes,
-	}
+		order := models.Order{
+			OrderNumber:    generateOrderNumber(),
+			CustomerID:     &req.CustomerID,
+			TariffID:       req.TariffID,
+			PickupLocation: req.PickupLocation,
+			DropLocation:   req.DropLocation,
+			Distance:       req.Distance,
+			Price:          price,
+			Status:         "pending",
+			PaymentStatus:  "pending",
+			CustomerPhone:  req.CustomerPhone,
+			CustomerName:   req.CustomerName,
+			Notes:          req.Notes,
+		}
 
-	if err := db.Create(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
-		return
-	}
+		if err := db.Create(&order).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+			return
+		}
 
-	// Send notification to available drivers
-	go sendNewOrderNotification(order)
+		// Send notification to available drivers
+		go sendNewOrderNotification(order)
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Order created successfully",
-		"order":   order,
+		c.JSON(http.StatusCreated, gin.H{
+			"message": "Order created successfully",
+			"order":   order,
+		})
 	})
 }
 

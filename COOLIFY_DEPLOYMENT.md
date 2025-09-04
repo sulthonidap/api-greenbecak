@@ -68,15 +68,30 @@ curl http://localhost:8080/health
 Setelah deployment berhasil, test endpoint berikut:
 
 ```bash
-# Health check
+# Health check (selalu return 200 OK)
 curl https://your-domain.com/health
+
+# Database status check
+curl https://your-domain.com/database/status
+
+# Readiness check (503 jika database tidak siap)
+curl https://your-domain.com/ready
+
+# Liveness check (selalu return 200 OK)
+curl https://your-domain.com/live
 
 # API documentation
 curl https://your-domain.com/swagger/
-
-# Test endpoint
-curl https://your-domain.com/api/v1/health
 ```
+
+### 6. Fallback Responses
+
+Aplikasi sekarang mendukung fallback responses ketika database belum terkoneksi:
+
+- **Health Check** (`/health`): Selalu return 200 OK dengan status database terpisah
+- **Database Status** (`/database/status`): Return 200 OK jika database connected, 503 jika tidak
+- **API Endpoints**: Return 503 dengan pesan fallback jika database tidak tersedia
+- **Readiness Check** (`/ready`): Return 503 jika database tidak siap
 
 ### 6. Monitoring
 
