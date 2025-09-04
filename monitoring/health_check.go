@@ -8,12 +8,12 @@ import (
 )
 
 type HealthStatus struct {
-	Database   bool      `json:"database"`
-	API        bool      `json:"api"`
-	Memory     bool      `json:"memory"`
-	Disk       bool      `json:"disk"`
-	LastCheck  time.Time `json:"last_check"`
-	Uptime     string    `json:"uptime"`
+	Database  bool      `json:"database"`
+	API       bool      `json:"api"`
+	Memory    bool      `json:"memory"`
+	Disk      bool      `json:"disk"`
+	LastCheck time.Time `json:"last_check"`
+	Uptime    string    `json:"uptime"`
 }
 
 var (
@@ -24,6 +24,10 @@ var (
 // CheckDatabaseHealth checks database connectivity
 func CheckDatabaseHealth() bool {
 	db := database.GetDB()
+	if db == nil {
+		log.Printf("Database connection not initialized")
+		return false
+	}
 	if err := db.Raw("SELECT 1").Error; err != nil {
 		log.Printf("Database health check failed: %v", err)
 		return false

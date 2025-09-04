@@ -86,8 +86,11 @@ func main() {
 	// Setup Swagger documentation
 	routes.SetupSwagger(r)
 
-	// Start monitoring schedulers
-	monitoring.StartAllSchedulers()
+	// Start monitoring schedulers with delay to ensure database is ready
+	go func() {
+		time.Sleep(10 * time.Second) // Wait for database connection to be ready
+		monitoring.StartAllSchedulers()
+	}()
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")
