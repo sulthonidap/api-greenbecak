@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  greenbecak-api:
+    build: .
+    container_name: greenbecak-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Configuration
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-greenbecak_db}
+      
+      # JWT Secret
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-here-change-this-in-production}
+      
+      # Server Configuration
+      - SERVER_PORT=8080
+      - SERVER_MODE=${SERVER_MODE:-release}
+      
+      # CORS Configuration
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - greenbecak-network
+
+networks:
+  greenbecak-network:
+    driver: bridge

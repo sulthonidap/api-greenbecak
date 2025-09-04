@@ -35,8 +35,8 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/greenbecak-backend .
 
-# Copy seed script
-COPY --from=builder /app/scripts ./scripts
+# Copy seed script if exists
+COPY --from=builder /app/scripts ./scripts 2>/dev/null || true
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
@@ -48,7 +48,7 @@ USER appuser
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the application

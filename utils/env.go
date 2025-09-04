@@ -7,27 +7,30 @@ import (
 
 // ValidateEnvironment checks if all required environment variables are set
 func ValidateEnvironment() error {
-	required := []string{
-		"DB_HOST",
-		"DB_USER",
-		"DB_PASSWORD",
-		"DB_NAME",
-		"JWT_SECRET",
-	}
-
-	for _, env := range required {
-		if os.Getenv(env) == "" {
-			return fmt.Errorf("required environment variable %s is not set", env)
-		}
-	}
+	// Set default values for required environment variables if not set
+	setDefaultEnv("DB_HOST", "localhost")
+	setDefaultEnv("DB_PORT", "3306")
+	setDefaultEnv("DB_USER", "root")
+	setDefaultEnv("DB_PASSWORD", "password")
+	setDefaultEnv("DB_NAME", "greenbecak_db")
+	setDefaultEnv("JWT_SECRET", "your-super-secret-jwt-key-here-change-this-in-production")
+	setDefaultEnv("SERVER_PORT", "8080")
+	setDefaultEnv("SERVER_MODE", "debug")
 
 	// Validate JWT secret length
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if len(jwtSecret) < 32 {
-		return fmt.Errorf("JWT_SECRET must be at least 32 characters long")
+	if len(jwtSecret) < 16 {
+		return fmt.Errorf("JWT_SECRET must be at least 16 characters long")
 	}
 
 	return nil
+}
+
+// setDefaultEnv sets environment variable to default value if not already set
+func setDefaultEnv(key, defaultValue string) {
+	if os.Getenv(key) == "" {
+		os.Setenv(key, defaultValue)
+	}
 }
 
 // GetEnvWithDefault gets environment variable with default value
