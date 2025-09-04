@@ -22,20 +22,13 @@ type HealthStatus struct {
 var startTime = time.Now()
 
 func HealthCheck(c *gin.Context) {
-	// Check database status
-	dbStatus := utils.GetDatabaseStatus()
-
-	// API is always healthy if the service is running
-	// Database status is reported separately
-	health := HealthStatus{
-		Status:    "healthy",
-		Timestamp: time.Now(),
-		Uptime:    time.Since(startTime).String(),
-		Version:   "1.0.0",
-		Services: map[string]string{
-			"api": "healthy",
-		},
-		Database: dbStatus,
+	// Simple health check - always return healthy if service is running
+	health := gin.H{
+		"status":    "healthy",
+		"timestamp": time.Now(),
+		"uptime":    time.Since(startTime).String(),
+		"version":   "1.0.0",
+		"message":   "Service is running",
 	}
 
 	c.JSON(http.StatusOK, health)

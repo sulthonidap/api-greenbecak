@@ -23,7 +23,7 @@ func InitDB() *gorm.DB {
 	retryDelay := 5 * time.Second
 
 	// Connect to MySQL with retry mechanism
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&allowNativePasswords=true&allowOldPasswords=true&autocommit=true&sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'&tls=false",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&allowNativePasswords=true&allowOldPasswords=true&autocommit=true&sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'&tls=skip-verify",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,

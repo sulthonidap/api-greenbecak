@@ -109,8 +109,21 @@ func main() {
 	}()
 
 	// Give server time to start
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 	log.Println("Server is ready to accept connections")
+
+	// Test health endpoint
+	go func() {
+		time.Sleep(5 * time.Second)
+		log.Println("Testing health endpoint...")
+		resp, err := http.Get("http://localhost:" + port + "/health")
+		if err != nil {
+			log.Printf("Health check failed: %v", err)
+		} else {
+			log.Printf("Health check status: %d", resp.StatusCode)
+			resp.Body.Close()
+		}
+	}()
 
 	// Wait for interrupt signal to gracefully shutdown the server
 	utils.GracefulShutdown(srv)
