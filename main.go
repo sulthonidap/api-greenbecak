@@ -52,9 +52,11 @@ func main() {
 
 	// Get allowed origins from environment variable
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	log.Printf("Raw CORS_ALLOWED_ORIGINS: '%s'", corsOrigins)
 	if corsOrigins == "" {
 		// Default to localhost if not set
 		corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
+		log.Println("Using default CORS origins (localhost)")
 	} else {
 		// Split comma-separated origins
 		origins := strings.Split(corsOrigins, ",")
@@ -62,6 +64,7 @@ func main() {
 			origins[i] = strings.TrimSpace(origin)
 		}
 		corsConfig.AllowOrigins = origins
+		log.Printf("Using CORS origins from environment: %v", origins)
 	}
 
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
@@ -73,6 +76,13 @@ func main() {
 	log.Printf("CORS Allowed Origins: %v", corsConfig.AllowOrigins)
 
 	r.Use(cors.New(corsConfig))
+
+	// Add CORS debug middleware
+	r.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		log.Printf("Request from origin: %s, Path: %s", origin, c.Request.URL.Path)
+		c.Next()
+	})
 
 	// Add logging middleware
 	r.Use(middleware.LoggingMiddleware())
