@@ -14,6 +14,7 @@ type Tariff struct {
 	Price        float64        `json:"price" gorm:"not null"`
 	Destinations string         `json:"destinations"` // Contoh destinasi (opsional)
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
+	IsGojek      bool           `json:"is_gojek" gorm:"default:false"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`

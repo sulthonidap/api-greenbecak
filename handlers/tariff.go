@@ -15,6 +15,7 @@ type CreateTariffRequest struct {
 	MaxDistance  float64 `json:"max_distance" binding:"required"`
 	Price        float64 `json:"price" binding:"required"`
 	Destinations string  `json:"destinations"`
+	IsGojek      bool    `json:"is_gojek"`
 }
 
 type UpdateTariffRequest struct {
@@ -24,6 +25,7 @@ type UpdateTariffRequest struct {
 	Price        float64 `json:"price"`
 	Destinations string  `json:"destinations"`
 	IsActive     *bool   `json:"is_active"`
+	IsGojek      *bool   `json:"is_gojek"`
 }
 
 type ToggleTariffActiveRequest struct {
@@ -46,6 +48,7 @@ func CreateTariff(c *gin.Context) {
 		Price:        req.Price,
 		Destinations: req.Destinations,
 		IsActive:     true,
+		IsGojek:      req.IsGojek,
 	}
 
 	if err := db.Create(&tariff).Error; err != nil {
@@ -126,6 +129,9 @@ func UpdateTariff(c *gin.Context) {
 	}
 	if req.IsActive != nil {
 		tariff.IsActive = *req.IsActive
+	}
+	if req.IsGojek != nil {
+		tariff.IsGojek = *req.IsGojek
 	}
 
 	if err := db.Save(&tariff).Error; err != nil {
