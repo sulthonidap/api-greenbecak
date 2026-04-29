@@ -120,8 +120,8 @@ func GetDriverLocation(c *gin.Context) {
 		return
 	}
 
-	// Check if driver is online (within last 5 minutes)
-	isOnline := time.Since(location.LastSeen) < 5*time.Minute
+	// Check if driver is online (must be explicitly online AND within last 5 minutes)
+	isOnline := location.IsOnline && time.Since(location.LastSeen) < 5*time.Minute
 	location.IsOnline = isOnline
 
 	c.JSON(http.StatusOK, gin.H{"location": location})
@@ -147,18 +147,17 @@ func GetCurrentDriverLocation(c *gin.Context) {
 
 	var location models.DriverLocation
 	if err := db.Where("driver_id = ?", driver.ID).First(&location).Error; err != nil {
-		// Return default offline status if location not found
-		c.JSON(http.StatusOK, gin.H{
-			"is_online": false,
-			"latitude":  0.0,
-			"longitude": 0.0,
-			"last_seen": time.Now(),
-		})
-		return
+		// Create default online status if location not found
+		location = models.DriverLocation{
+			DriverID: driver.ID,
+			IsOnline: true,
+			LastSeen: time.Now(),
+		}
+		db.Create(&location)
 	}
 
-	// Check if driver is online (within last 5 minutes)
-	isOnline := time.Since(location.LastSeen) < 5*time.Minute
+	// Check if driver is online (must be explicitly online AND within last 5 minutes)
+	isOnline := location.IsOnline && time.Since(location.LastSeen) < 5*time.Minute
 	location.IsOnline = isOnline
 
 	c.JSON(http.StatusOK, gin.H{

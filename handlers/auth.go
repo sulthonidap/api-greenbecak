@@ -71,6 +71,21 @@ func Login(c *gin.Context) {
 	if user.Role == models.RoleDriver {
 		var driver models.Driver
 		if err := db.Where("user_id = ?", user.ID).First(&driver).Error; err == nil {
+			// Update driver location to online automatically
+			var location models.DriverLocation
+			if err := db.Where("driver_id = ?", driver.ID).First(&location).Error; err == nil {
+				location.IsOnline = true
+				location.LastSeen = time.Now()
+				db.Save(&location)
+			} else {
+				location = models.DriverLocation{
+					DriverID: driver.ID,
+					IsOnline: true,
+					LastSeen: time.Now(),
+				}
+				db.Create(&location)
+			}
+
 			// Create response with both user and driver info
 			responseData = gin.H{
 				"id":            user.ID,
