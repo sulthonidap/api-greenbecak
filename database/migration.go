@@ -12,7 +12,7 @@ import (
 func RunMigrations(db *gorm.DB) error {
 	log.Println("Running database migrations...")
 
-	// Auto migrate all models (temporarily exclude DriverLocation)
+	// Auto migrate all models
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Driver{},
@@ -20,6 +20,7 @@ func RunMigrations(db *gorm.DB) error {
 		&models.Tariff{},
 		&models.Payment{},
 		&models.Withdrawal{},
+		&models.DriverLocation{},
 	)
 
 	if err != nil {
