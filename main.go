@@ -42,6 +42,8 @@ func main() {
 
 	// Initialize router with custom recovery
 	r := gin.New()
+	r.RedirectTrailingSlash = false  // Prevent 301 redirects that break CORS
+	r.RedirectFixedPath = false
 	r.Use(middleware.RecoveryMiddleware())
 
 	// Load HTML templates
