@@ -167,6 +167,31 @@ func CreateOrderPublic(c *gin.Context) {
 	})
 }
 
+// ConfirmOrderPaymentPublic allows customers to confirm payment publicly (especially for subsidized/cash orders)
+func ConfirmOrderPaymentPublic(c *gin.Context) {
+	orderID := c.Param("id")
+	db := database.GetDB()
+
+	var order models.Order
+	if err := db.First(&order, orderID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	order.PaymentStatus = "paid"
+	order.Status = "accepted"
+
+	if err := db.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order payment status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Payment confirmed successfully",
+		"order":   order,
+	})
+}
+
 // GetOrderHistory returns orders by customer phone
 func GetOrderHistory(c *gin.Context) {
 	phone := c.Query("phone")
