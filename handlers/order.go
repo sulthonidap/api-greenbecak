@@ -179,7 +179,6 @@ func ConfirmOrderPaymentPublic(c *gin.Context) {
 	}
 
 	order.PaymentStatus = "paid"
-	order.Status = "accepted"
 
 	if err := db.Save(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order payment status"})
