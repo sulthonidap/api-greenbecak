@@ -204,6 +204,27 @@ func DeleteDriver(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Driver deleted successfully"})
 }
 
+// CheckDriverByCodePublic checks if a driver code exists (public endpoint)
+func CheckDriverByCodePublic(c *gin.Context) {
+	code := c.Param("code")
+	db := database.GetDB()
+
+	var driver models.Driver
+	if err := db.Where("driver_code = ?", code).First(&driver).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"exists": false,
+			"message": "Driver tidak ditemukan di sistem kami. Pesanan akan diproses sebagai driver baru/manual.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exists": true,
+		"name":   driver.Name,
+		"message": "Driver ditemukan: " + driver.Name,
+	})
+}
+
 func GetDriverPerformance(c *gin.Context) {
 	driverID := c.Param("id")
 	db := database.GetDB()

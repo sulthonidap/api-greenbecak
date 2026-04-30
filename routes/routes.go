@@ -58,6 +58,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		api.GET("/tariffs/public", handlers.GetTariffsPublic)
 		api.GET("/tariffs/public/:id", handlers.GetTariffPublic)
 
+		// Public driver check endpoint
+		api.GET("/drivers/public/check/:code", handlers.CheckDriverByCodePublic)
+
 		// Public driver orders endpoint (for testing) - must be before protected routes
 		api.GET("/driver/:driver_id/orders", handlers.GetOrdersByDriverID)
 

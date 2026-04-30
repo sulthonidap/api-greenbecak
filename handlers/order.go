@@ -120,11 +120,11 @@ func CreateOrderPublic(c *gin.Context) {
 		return
 	}
 
-	// Find driver by becak code
+	// Find driver by becak code (Optional in V2)
 	var driver models.Driver
-	if err := db.Where("driver_code = ?", req.BecakCode).First(&driver).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Becak code not found"})
-		return
+	var driverID *uint
+	if err := db.Where("driver_code = ?", req.BecakCode).First(&driver).Error; err == nil {
+		driverID = &driver.ID
 	}
 
 	// Set default customer name if not provided
@@ -139,7 +139,7 @@ func CreateOrderPublic(c *gin.Context) {
 	order := models.Order{
 		OrderNumber:    generateOrderNumber(),
 		BecakCode:      req.BecakCode,
-		DriverID:       &driver.ID,
+		DriverID:       driverID,
 		TariffID:       req.TariffID,
 		PickupLocation: "", // Akan diisi nanti oleh sistem/driver
 		DropLocation:   "", // Akan diisi nanti oleh sistem/driver
@@ -157,14 +157,26 @@ func CreateOrderPublic(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	// Response data
+	resp := gin.H{
 		"message": "Order created successfully",
 		"order":   order,
-		"driver": gin.H{
+	}
+
+	// Add driver info if found
+	if driverID != nil {
+		resp["driver"] = gin.H{
 			"name":  driver.Name,
 			"phone": driver.Phone,
-		},
-	})
+		}
+	} else {
+		resp["driver"] = gin.H{
+			"name":  "Unregistered Driver (" + req.BecakCode + ")",
+			"phone": "-",
+		}
+	}
+
+	c.JSON(http.StatusCreated, resp)
 }
 
 // ConfirmOrderPaymentPublic allows customers to confirm payment publicly (especially for subsidized/cash orders)
