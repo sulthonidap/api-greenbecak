@@ -31,7 +31,7 @@ type Driver struct {
 	Phone         string         `json:"phone" gorm:"not null"`
 	Email         string         `json:"email"`
 	Address       string         `json:"address"`
-	IDCard        string         `json:"id_card" gorm:"unique"`
+	IDCard        string         `json:"id_card"`
 	VehicleNumber string         `json:"vehicle_number"`
 	VehicleType   VehicleType    `json:"vehicle_type" gorm:"type:enum('becak_manual','becak_motor','becak_listrik','andong');default:'becak_manual'"`
 	Status        DriverStatus   `json:"status" gorm:"type:enum('active','inactive','on_trip');default:'active'"`
