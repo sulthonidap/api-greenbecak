@@ -17,6 +17,7 @@ type CreateTariffRequest struct {
 	Destinations string  `json:"destinations"`
 	IsGojek      bool    `json:"is_gojek"`
 	IsSubsidi    bool    `json:"is_subsidi"`
+	IsNonTunai   bool    `json:"is_non_tunai"`
 }
 
 type UpdateTariffRequest struct {
@@ -28,6 +29,7 @@ type UpdateTariffRequest struct {
 	IsActive     *bool   `json:"is_active"`
 	IsGojek      *bool   `json:"is_gojek"`
 	IsSubsidi    *bool   `json:"is_subsidi"`
+	IsNonTunai   *bool   `json:"is_non_tunai"`
 }
 
 type ToggleTariffActiveRequest struct {
@@ -52,6 +54,7 @@ func CreateTariff(c *gin.Context) {
 		IsActive:     true,
 		IsGojek:      req.IsGojek,
 		IsSubsidi:    req.IsSubsidi,
+		IsNonTunai:   req.IsNonTunai,
 	}
 
 	if err := db.Create(&tariff).Error; err != nil {
@@ -138,6 +141,9 @@ func UpdateTariff(c *gin.Context) {
 	}
 	if req.IsSubsidi != nil {
 		tariff.IsSubsidi = *req.IsSubsidi
+	}
+	if req.IsNonTunai != nil {
+		tariff.IsNonTunai = *req.IsNonTunai
 	}
 
 	if err := db.Save(&tariff).Error; err != nil {

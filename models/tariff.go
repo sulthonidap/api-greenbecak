@@ -16,6 +16,7 @@ type Tariff struct {
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
 	IsGojek      bool           `json:"is_gojek" gorm:"default:false"`
 	IsSubsidi    bool           `json:"is_subsidi" gorm:"default:false"`
+	IsNonTunai   bool           `json:"is_non_tunai" gorm:"default:false"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
