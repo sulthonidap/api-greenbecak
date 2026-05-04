@@ -33,7 +33,7 @@ type UpdateTariffRequest struct {
 }
 
 type ToggleTariffActiveRequest struct {
-	IsActive bool `json:"is_active" binding:"required"`
+	IsActive *bool `json:"is_active" binding:"required"`
 }
 
 func CreateTariff(c *gin.Context) {
@@ -187,7 +187,9 @@ func ToggleTariffActive(c *gin.Context) {
 	}
 
 	// Toggle active status
-	tariff.IsActive = req.IsActive
+	if req.IsActive != nil {
+		tariff.IsActive = *req.IsActive
+	}
 
 	if err := db.Save(&tariff).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tariff status"})
@@ -195,7 +197,7 @@ func ToggleTariffActive(c *gin.Context) {
 	}
 
 	statusText := "activated"
-	if !req.IsActive {
+	if req.IsActive != nil && !*req.IsActive {
 		statusText = "deactivated"
 	}
 
