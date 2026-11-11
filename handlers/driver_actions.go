@@ -10,6 +10,7 @@ import (
 	"greenbecak-backend/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func GetDriverOrders(c *gin.Context) {
@@ -120,53 +121,67 @@ func GetOrdersByDriverID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
 
+// AcceptOrder: driver menerima order. Atomic — kalau dua driver menekan Terima
+// bersamaan, hanya satu yang berhasil.
 func AcceptOrder(c *gin.Context) {
-	orderID := c.Param("id")
 	db := database.GetDB()
-	userID, _ := c.Get("user_id")
+	driver, ok := currentDriver(c, db)
+	if !ok {
+		return
+	}
 
 	var order models.Order
-	if err := db.First(&order, orderID).Error; err != nil {
+	if err := db.First(&order, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
 
-	// Check if order is pending
 	if order.Status != models.OrderStatusPending {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Order is not available for acceptance"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Order sudah tidak tersedia"})
+		return
+	}
+	if !driver.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Akun driver tidak aktif"})
 		return
 	}
 
-	// Check if driver is available - find driver by user_id
-	var driver models.Driver
-	if err := db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
+	if order.OrderType == models.OrderTypeBooking {
+		if order.ExpiresAt != nil && time.Now().After(*order.ExpiresAt) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Booking sudah kedaluwarsa"})
+			return
+		}
+		if order.VehicleType != "" && string(driver.VehicleType) != order.VehicleType {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Jenis kendaraan tidak sesuai dengan booking"})
+			return
+		}
+		if driverBusy(db, driver.ID, order.ID) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Selesaikan order yang sedang berjalan terlebih dahulu"})
+			return
+		}
+	} else if order.DriverID != nil && *order.DriverID != driver.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Order milik driver lain"})
 		return
 	}
 
-	if driver.Status != models.DriverStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Driver is not available"})
-		return
-	}
-
-	// Update order
 	now := time.Now()
-	order.Status = models.OrderStatusAccepted
-	order.DriverID = &driver.ID
-	order.AcceptedAt = &now
-
-	// Update driver status
-	driver.Status = models.DriverStatusOnTrip
-
-	if err := db.Save(&order).Error; err != nil {
+	res := db.Model(&models.Order{}).
+		Where("id = ? AND status = ? AND (driver_id IS NULL OR driver_id = ?)", order.ID, models.OrderStatusPending, driver.ID).
+		Updates(map[string]interface{}{
+			"status":      models.OrderStatusAccepted,
+			"driver_id":   driver.ID,
+			"accepted_at": now,
+		})
+	if res.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept order"})
 		return
 	}
-
-	if err := db.Save(&driver).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update driver status"})
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Order sudah diambil driver lain"})
 		return
 	}
+
+	db.Model(&driver).Update("status", models.DriverStatusOnTrip)
+	db.Preload("Tariff").First(&order, order.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Order accepted successfully",
@@ -174,56 +189,64 @@ func AcceptOrder(c *gin.Context) {
 	})
 }
 
+// CompleteOrder: driver menyelesaikan order.
+// Bisa dari status accepted / picked_up, atau langsung dari pending untuk order langsung
+// (scan QR) milik driver ini.
 func CompleteOrder(c *gin.Context) {
-	orderID := c.Param("id")
 	db := database.GetDB()
-	userID, _ := c.Get("user_id")
+	driver, ok := currentDriver(c, db)
+	if !ok {
+		return
+	}
 
 	var order models.Order
-	if err := db.First(&order, orderID).Error; err != nil {
+	if err := db.First(&order, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
 
-	// Find driver by user_id
-	var driver models.Driver
-	if err := db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
-		return
-	}
-
-	// Check if order belongs to driver
 	if order.DriverID == nil || *order.DriverID != driver.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Order does not belong to this driver"})
 		return
 	}
 
-	// Check if order is accepted
-	if order.Status != models.OrderStatusAccepted {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Order is not in accepted status"})
-		return
+	allowed := []models.OrderStatus{models.OrderStatusAccepted, models.OrderStatusPickedUp}
+	if order.OrderType != models.OrderTypeBooking {
+		allowed = append(allowed, models.OrderStatusPending)
 	}
 
-	// Update order
 	now := time.Now()
-	order.Status = models.OrderStatusCompleted
-	order.CompletedAt = &now
-
-	// Update driver status and earnings
-	driver.Status = models.DriverStatusActive
-	driver.TotalTrips++
-	driver.TotalEarnings += order.Price
-
-	if err := db.Save(&order).Error; err != nil {
+	updates := map[string]interface{}{
+		"status":       models.OrderStatusCompleted,
+		"completed_at": now,
+	}
+	// Booking dibayar langsung ke driver di akhir perjalanan (tunai/QRIS),
+	// jadi saat driver menekan Selesai pembayaran dianggap lunas.
+	if order.OrderType == models.OrderTypeBooking {
+		updates["payment_status"] = "paid"
+	}
+	res := db.Model(&models.Order{}).
+		Where("id = ? AND driver_id = ? AND status IN ?", order.ID, driver.ID, allowed).
+		Updates(updates)
+	if res.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete order"})
 		return
 	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order tidak bisa diselesaikan dari status saat ini"})
+		return
+	}
 
-	if err := db.Save(&driver).Error; err != nil {
+	if err := db.Model(&models.Driver{}).Where("id = ?", driver.ID).Updates(map[string]interface{}{
+		"status":         models.DriverStatusActive,
+		"total_trips":    gorm.Expr("total_trips + 1"),
+		"total_earnings": gorm.Expr("total_earnings + ?", order.Price),
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update driver"})
 		return
 	}
 
+	db.First(&order, order.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Order completed successfully",
 		"order":   order,

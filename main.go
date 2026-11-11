@@ -9,6 +9,7 @@ import (
 
 	"greenbecak-backend/config"
 	"greenbecak-backend/database"
+	"greenbecak-backend/handlers"
 	"greenbecak-backend/middleware"
 	"greenbecak-backend/monitoring"
 	"greenbecak-backend/routes"
@@ -102,6 +103,7 @@ func main() {
 	go func() {
 		time.Sleep(10 * time.Second) // Wait for database connection to be ready
 		monitoring.StartAllSchedulers()
+		handlers.StartBookingExpiryScheduler()
 	}()
 
 	// Start server

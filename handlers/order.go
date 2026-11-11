@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -30,6 +32,12 @@ type CreateOrderPublicRequest struct {
 	CustomerPhone string `json:"customer_phone" binding:"required"`
 	CustomerName  string `json:"customer_name"`
 	Notes         string `json:"notes"`
+
+	// Opsional: asal order & posisi GPS penumpang
+	Source      string   `json:"source"`
+	SourceRef   string   `json:"source_ref"`
+	CustomerLat *float64 `json:"customer_lat"`
+	CustomerLng *float64 `json:"customer_lng"`
 }
 
 type UpdateOrderRequest struct {
@@ -42,9 +50,15 @@ type UpdateOrderLocationRequest struct {
 	Distance       float64 `json:"distance" binding:"required"`
 }
 
-// generateOrderNumber creates a unique order number
+// generateOrderNumber creates a unique order number.
+// Ditambah 3 digit acak supaya dua order di detik yang sama tidak bentrok.
 func generateOrderNumber() string {
-	return fmt.Sprintf("ORD-%d", time.Now().Unix())
+	n, err := rand.Int(rand.Reader, big.NewInt(1000))
+	suffix := int64(0)
+	if err == nil {
+		suffix = n.Int64()
+	}
+	return fmt.Sprintf("ORD-%d%03d", time.Now().Unix(), suffix)
 }
 
 func CreateOrder(c *gin.Context) {
@@ -76,7 +90,9 @@ func CreateOrder(c *gin.Context) {
 		order := models.Order{
 			OrderNumber:    generateOrderNumber(),
 			CustomerID:     &req.CustomerID,
-			TariffID:       req.TariffID,
+			TariffID:       &tariff.ID,
+			OrderType:      models.OrderTypeLangsung,
+			Source:         models.OrderSourceWeb,
 			PickupLocation: req.PickupLocation,
 			DropLocation:   req.DropLocation,
 			Distance:       req.Distance,
@@ -136,11 +152,26 @@ func CreateOrderPublic(c *gin.Context) {
 	distance := tariff.MaxDistance
 	price := tariff.Price
 
+	// Asal order: default qr_becak kalau driver ditemukan dari kode, selain itu web
+	source := sanitizeSource(req.Source)
+	if source == "" {
+		source = models.OrderSourceWeb
+	}
+	sourceRef := sanitizeSourceRef(req.SourceRef)
+	if sourceRef == "" && source == models.OrderSourceQRBecak {
+		sourceRef = req.BecakCode
+	}
+
 	order := models.Order{
 		OrderNumber:    generateOrderNumber(),
 		BecakCode:      req.BecakCode,
 		DriverID:       driverID,
-		TariffID:       req.TariffID,
+		TariffID:       &tariff.ID,
+		OrderType:      models.OrderTypeLangsung,
+		Source:         source,
+		SourceRef:      sourceRef,
+		CustomerLat:    validLatPtr(req.CustomerLat),
+		CustomerLng:    validLngPtr(req.CustomerLng),
 		PickupLocation: "", // Akan diisi nanti oleh sistem/driver
 		DropLocation:   "", // Akan diisi nanti oleh sistem/driver
 		Distance:       distance,
@@ -245,7 +276,7 @@ func GetOrders(c *gin.Context) {
 	role, _ := c.Get("role")
 
 	var orders []models.Order
-	query := db.Preload("Customer").Preload("Driver").Preload("Tariff")
+	query := db.Preload("Customer").Preload("Driver").Preload("Tariff").Preload("Hotel")
 
 	// Filter based on role
 	if role == "admin" {
@@ -262,8 +293,17 @@ func GetOrders(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if orderType := c.Query("order_type"); orderType != "" {
+		query = query.Where("order_type = ?", orderType)
+	}
+	if source := c.Query("source"); source != "" {
+		query = query.Where("source = ?", source)
+	}
+	if hotelID := c.Query("hotel_id"); hotelID != "" {
+		query = query.Where("hotel_id = ?", hotelID)
+	}
 
-	if err := query.Find(&orders).Error; err != nil {
+	if err := query.Order("created_at DESC").Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
 		return
 	}

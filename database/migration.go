@@ -16,6 +16,9 @@ func RunMigrations(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Driver{},
+		&models.Hotel{},
+		&models.Destination{},
+		&models.BookingRate{},
 		&models.Order{},
 		&models.Tariff{},
 		&models.Payment{},
@@ -34,7 +37,62 @@ func RunMigrations(db *gorm.DB) error {
 		log.Printf("Info: Skipping enum alter for users.role (may already be up-to-date): %v", err)
 	}
 
+	// Tambah status 'picked_up' untuk booking
+	if err := db.Exec("ALTER TABLE orders MODIFY COLUMN status ENUM('pending','accepted','picked_up','completed','cancelled') DEFAULT 'pending'").Error; err != nil {
+		log.Printf("Info: Skipping enum alter for orders.status: %v", err)
+	}
+
+	// Order lama tanpa tipe dianggap order langsung
+	if err := db.Exec("UPDATE orders SET order_type = 'langsung' WHERE order_type IS NULL OR order_type = ''").Error; err != nil {
+		log.Printf("Info: Skipping order_type backfill: %v", err)
+	}
+
+	if err := seedBookingDefaults(db); err != nil {
+		log.Printf("Warning: seeding booking defaults failed: %v", err)
+	}
+
 	log.Println("Database migrations completed successfully")
+	return nil
+}
+
+// seedBookingDefaults mengisi tarif booking & destinasi populer awal, hanya jika tabel masih kosong.
+// Semua nilai bisa diubah admin. Koordinat destinasi adalah perkiraan — mohon dicek di menu admin.
+func seedBookingDefaults(db *gorm.DB) error {
+	var count int64
+	db.Model(&models.BookingRate{}).Count(&count)
+	if count == 0 {
+		rates := []models.BookingRate{
+			{VehicleType: string(models.VehicleTypeBecakListrik), Label: "Becak Listrik", BaseFare: 5000, PerKm: 4000, MinFare: 10000, MaxDistanceKm: 10, Rounding: 1000, IsActive: true},
+			{VehicleType: string(models.VehicleTypeAndong), Label: "Andong", BaseFare: 15000, PerKm: 8000, MinFare: 30000, MaxDistanceKm: 10, Rounding: 1000, IsActive: true},
+		}
+		if err := db.Create(&rates).Error; err != nil {
+			return err
+		}
+		log.Println("Seeded default booking rates (contoh — ubah di menu admin)")
+	}
+
+	db.Model(&models.Destination{}).Count(&count)
+	if count == 0 {
+		dests := []models.Destination{
+			{Name: "Tugu Yogyakarta", Category: "wisata", Address: "Jl. Jend. Sudirman, Gowongan", Latitude: -7.78284, Longitude: 110.36703, SortOrder: 1},
+			{Name: "Stasiun Tugu Yogyakarta", Category: "transportasi", Address: "Jl. Pasar Kembang, Sosromenduran", Latitude: -7.78917, Longitude: 110.36334, SortOrder: 2},
+			{Name: "Jalan Malioboro", Category: "belanja", Address: "Jl. Malioboro, Sosromenduran", Latitude: -7.79254, Longitude: 110.36580, SortOrder: 3},
+			{Name: "Pasar Beringharjo", Category: "belanja", Address: "Jl. Margo Mulyo, Ngupasan", Latitude: -7.79856, Longitude: 110.36531, SortOrder: 4},
+			{Name: "Benteng Vredeburg", Category: "wisata", Address: "Jl. Margo Mulyo No.6, Ngupasan", Latitude: -7.80022, Longitude: 110.36628, SortOrder: 5},
+			{Name: "Titik Nol Kilometer", Category: "wisata", Address: "Jl. Panembahan Senopati, Prawirodirjan", Latitude: -7.80134, Longitude: 110.36472, SortOrder: 6},
+			{Name: "Kraton Yogyakarta (Keraton)", Category: "wisata", Address: "Jl. Rotowijayan Blok No.1, Panembahan", Latitude: -7.80529, Longitude: 110.36421, SortOrder: 7},
+			{Name: "Taman Sari", Category: "wisata", Address: "Jl. Taman, Patehan", Latitude: -7.81008, Longitude: 110.35921, SortOrder: 8},
+			{Name: "Alun-Alun Kidul", Category: "wisata", Address: "Patehan, Kraton", Latitude: -7.81182, Longitude: 110.36336, SortOrder: 9},
+			{Name: "Kampung Wisata Prawirotaman", Category: "kuliner", Address: "Jl. Prawirotaman, Brontokusuman", Latitude: -7.81973, Longitude: 110.36947, SortOrder: 10},
+		}
+		for i := range dests {
+			dests[i].IsActive = true
+		}
+		if err := db.Create(&dests).Error; err != nil {
+			return err
+		}
+		log.Println("Seeded default destinations (koordinat perkiraan — cek di menu admin)")
+	}
 	return nil
 }
 

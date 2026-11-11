@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"greenbecak-backend/handlers"
 	"greenbecak-backend/middleware"
 
@@ -50,6 +52,22 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		api.POST("/orders/public", handlers.CreateOrderPublic)
 		api.POST("/orders/public/:id/pay", handlers.ConfirmOrderPaymentPublic)
 		api.GET("/orders/history", handlers.GetOrderHistory)
+
+		// ===== Booking (pesan dari lokasi penumpang, publik tanpa login) =====
+		bookingCreateLimit := middleware.NewRateLimiter(5, time.Minute).RateLimit()
+		bookingQuoteLimit := middleware.NewRateLimiter(30, time.Minute).RateLimit()
+		geoLimit := middleware.NewRateLimiter(60, time.Minute).RateLimit()
+
+		api.GET("/booking/config", handlers.GetBookingConfig)
+		api.POST("/booking/quote", bookingQuoteLimit, handlers.GetBookingQuote)
+		api.POST("/booking", bookingCreateLimit, handlers.CreateBooking)
+		api.GET("/booking/status/:token", handlers.GetBookingStatus)
+		api.POST("/booking/status/:token/cancel", bookingQuoteLimit, handlers.CancelBookingByCustomer)
+		api.GET("/hotels/public/:slug", handlers.GetHotelPublic)
+
+		// Pencarian alamat & pin peta (OpenStreetMap)
+		api.GET("/geo/search", geoLimit, handlers.SearchPlaces)
+		api.GET("/geo/reverse", geoLimit, handlers.ReverseGeocode)
 
 		// Public admin creation endpoint (no auth required)
 		api.POST("/admin/public", handlers.CreateAdminPublic)
@@ -179,6 +197,28 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 				payments.GET("/stats", handlers.GetPaymentStats)
 			}
 
+			// Booking: hotel mitra, destinasi populer, tarif per km
+			hotels := admin.Group("/hotels")
+			{
+				hotels.GET("/", handlers.GetHotels)
+				hotels.POST("/", handlers.CreateHotel)
+				hotels.PUT("/:id", handlers.UpdateHotel)
+				hotels.DELETE("/:id", handlers.DeleteHotel)
+			}
+			destinations := admin.Group("/destinations")
+			{
+				destinations.GET("/", handlers.GetDestinations)
+				destinations.POST("/", handlers.CreateDestination)
+				destinations.PUT("/:id", handlers.UpdateDestination)
+				destinations.DELETE("/:id", handlers.DeleteDestination)
+			}
+			bookingRates := admin.Group("/booking-rates")
+			{
+				bookingRates.GET("/", handlers.GetBookingRates)
+				bookingRates.POST("/", handlers.CreateBookingRate)
+				bookingRates.PUT("/:id", handlers.UpdateBookingRate)
+			}
+
 			// Notification management (admin only)
 			notifications := admin.Group("/notifications")
 			{
@@ -200,6 +240,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			driver.GET("/orders", handlers.GetDriverOrders)
 			driver.PUT("/orders/:id/accept", handlers.AcceptOrder)
 			driver.PUT("/orders/:id/complete", handlers.CompleteOrder)
+			driver.PUT("/orders/:id/pickup", handlers.PickupOrder)
+			driver.PUT("/orders/:id/release", handlers.ReleaseBooking)
+			driver.GET("/bookings/available", handlers.GetAvailableBookings)
 			driver.GET("/earnings", handlers.GetDriverEarnings)
 			driver.POST("/withdrawals", handlers.CreateWithdrawal)
 			driver.GET("/withdrawals", handlers.GetDriverWithdrawals)

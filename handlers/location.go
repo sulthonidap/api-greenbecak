@@ -42,7 +42,16 @@ func UpdateDriverLocation(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	driverID, _ := c.Get("user_id")
+
+	// Simpan dengan ID driver (bukan ID user) supaya konsisten dengan SetDriverOnlineStatus
+	// dan pencarian driver terdekat.
+	userID, _ := c.Get("user_id")
+	var drv models.Driver
+	if err := db.Where("user_id = ?", userID).First(&drv).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found for this user"})
+		return
+	}
+	driverID := drv.ID
 
 	// Validate coordinates
 	if req.Latitude < -90 || req.Latitude > 90 {
@@ -66,7 +75,7 @@ func UpdateDriverLocation(c *gin.Context) {
 	if result.Error == gorm.ErrRecordNotFound {
 		// Create new location record
 		location = models.DriverLocation{
-			DriverID:  driverID.(uint),
+			DriverID:  driverID,
 			Latitude:  req.Latitude,
 			Longitude: req.Longitude,
 			Accuracy:  req.Accuracy,
@@ -267,13 +276,25 @@ func GetDriverRoute(c *gin.Context) {
 
 // SetDriverOnlineStatus - Set status online/offline driver
 func SetDriverOnlineStatus(c *gin.Context) {
-	var req struct {
-		IsOnline bool `json:"is_online"`
+	// Terima "is_online" maupun "isOnline" (aplikasi Android mengirim isOnline)
+	var body struct {
+		IsOnlineSnake *bool `json:"is_online"`
+		IsOnlineCamel *bool `json:"isOnline"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		fmt.Printf("Error binding JSON: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req struct{ IsOnline bool }
+	switch {
+	case body.IsOnlineSnake != nil:
+		req.IsOnline = *body.IsOnlineSnake
+	case body.IsOnlineCamel != nil:
+		req.IsOnline = *body.IsOnlineCamel
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "is_online is required"})
 		return
 	}
 
