@@ -45,6 +45,8 @@ func GetAvailableBookings(c *gin.Context) {
 	db.Where("order_type = ? AND status = ? AND driver_id IS NULL AND (expires_at IS NULL OR expires_at > ?)",
 		models.OrderTypeBooking, models.OrderStatusPending, time.Now()).
 		Where("vehicle_type = ? OR vehicle_type = ''", driver.VehicleType).
+		// Booking yang memakai kode becak tertentu tidak disiarkan ke driver lain
+		Where("becak_code = '' OR becak_code IS NULL").
 		Order("created_at ASC").
 		Find(&orders)
 

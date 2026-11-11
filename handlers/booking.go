@@ -60,15 +60,26 @@ func bookingDispatchEnabled() bool {
 	return false
 }
 
-// findDriverByCode mencari driver aktif berdasarkan kode becak (stiker QR).
+// normalizeBecakCode: rapikan kode becak yang diketik penumpang (spasi, huruf besar, panjang).
+func normalizeBecakCode(code string) string {
+	code = strings.ToUpper(sanitizeSourceRef(code))
+	if len([]rune(code)) > 30 {
+		code = string([]rune(code)[:30])
+	}
+	return code
+}
+
+// findDriverByCode mencari driver berdasarkan kode becak (stiker QR).
+// Kode yang belum terdaftar TIDAK dianggap error (sama seperti /pesan): hasilnya (nil, nil)
+// dan booking tetap dicatat dengan kode tersebut. Error hanya untuk driver yang dinonaktifkan.
 func findDriverByCode(db *gorm.DB, code string) (*models.Driver, error) {
-	code = strings.TrimSpace(code)
+	code = normalizeBecakCode(code)
 	if code == "" {
 		return nil, &quoteError{http.StatusBadRequest, "Kode becak wajib diisi"}
 	}
 	var driver models.Driver
 	if err := db.Where("driver_code = ?", code).First(&driver).Error; err != nil {
-		return nil, &quoteError{http.StatusBadRequest, "Kode becak tidak terdaftar. Periksa kembali kode pada stiker becak."}
+		return nil, nil
 	}
 	if !driver.IsActive {
 		return nil, &quoteError{http.StatusBadRequest, "Becak dengan kode ini sedang tidak aktif"}
@@ -400,7 +411,8 @@ func computeQuote(db *gorm.DB, req BookingQuoteRequest) (*BookingQuote, *models.
 		return nil, nil, &quoteError{http.StatusBadRequest, "Tujuan berada di luar area layanan"}
 	}
 
-	// Kode becak → driver tertentu; tarif mengikuti jenis kendaraan becak tersebut
+	// Kode becak terdaftar → tarif mengikuti jenis kendaraan becak tersebut.
+	// Kode belum terdaftar → tarif mengikuti jenis kendaraan yang dipilih penumpang.
 	var quoteDriver *QuoteDriver
 	vehicleType := strings.TrimSpace(req.VehicleType)
 	if strings.TrimSpace(req.BecakCode) != "" {
@@ -408,10 +420,12 @@ func computeQuote(db *gorm.DB, req BookingQuoteRequest) (*BookingQuote, *models.
 		if err != nil {
 			return nil, nil, err
 		}
-		vehicleType = string(driver.VehicleType)
-		quoteDriver = &QuoteDriver{
-			Code: driver.DriverCode, Name: driver.Name,
-			VehicleNumber: driver.VehicleNumber, VehicleType: string(driver.VehicleType),
+		if driver != nil {
+			vehicleType = string(driver.VehicleType)
+			quoteDriver = &QuoteDriver{
+				Code: driver.DriverCode, Name: driver.Name,
+				VehicleNumber: driver.VehicleNumber, VehicleType: string(driver.VehicleType),
+			}
 		}
 	}
 
@@ -606,8 +620,9 @@ func CreateBooking(c *gin.Context) {
 		source = models.OrderSourceWeb
 	}
 
-	// Kode becak → order langsung ke driver itu. Tanpa kode → dicarikan driver (kalau dispatch aktif).
-	becakCode := strings.TrimSpace(req.BecakCode)
+	// Kode becak → order langsung ke driver itu (atau dicatat apa adanya kalau belum terdaftar).
+	// Tanpa kode → dicarikan driver (kalau dispatch aktif).
+	becakCode := normalizeBecakCode(req.BecakCode)
 	var targetDriver *models.Driver
 	if becakCode != "" {
 		d, err := findDriverByCode(db, becakCode)
@@ -643,13 +658,14 @@ func CreateBooking(c *gin.Context) {
 		return
 	}
 	// Batas waktu hanya untuk booking yang dicarikan driver. Booking dengan kode becak
-	// sudah punya driver, jadi tidak kedaluwarsa (sama seperti order langsung).
+	// (terdaftar maupun belum) sudah tertuju ke becak tertentu, jadi tidak kedaluwarsa
+	// — sama seperti order langsung.
 	var expiresAt *time.Time
 	var driverID *uint
 	if targetDriver != nil {
 		driverID = &targetDriver.ID
 		becakCode = targetDriver.DriverCode
-	} else {
+	} else if becakCode == "" {
 		exp := time.Now().Add(time.Duration(bookingExpiryMinutes()) * time.Minute)
 		expiresAt = &exp
 	}
@@ -690,10 +706,14 @@ func CreateBooking(c *gin.Context) {
 	}
 
 	message := "Booking berhasil dibuat, sedang mencari becak"
-	if targetDriver != nil {
+	switch {
+	case targetDriver != nil:
 		message = "Booking berhasil dikirim ke " + targetDriver.Name
 		go notifyTargetDriver(*targetDriver, order)
-	} else {
+	case becakCode != "":
+		// Becak belum terdaftar: dicatat saja, tidak ada driver yang diberi notifikasi
+		message = "Booking tercatat untuk becak " + becakCode
+	default:
 		go notifyDriversForBooking(order)
 	}
 
@@ -719,6 +739,8 @@ func bookingStatusView(db *gorm.DB, order models.Order) gin.H {
 	// Booking dengan kode becak sudah punya driver sejak awal
 	if order.Status == models.OrderStatusPending && order.DriverID != nil {
 		statusLabel = "Menunggu konfirmasi driver"
+	} else if order.Status == models.OrderStatusPending && order.BecakCode != "" {
+		statusLabel = "Pesanan tercatat"
 	}
 	view := gin.H{
 		"order_number":    order.OrderNumber,

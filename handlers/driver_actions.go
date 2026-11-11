@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"greenbecak-backend/database"
@@ -146,6 +147,11 @@ func AcceptOrder(c *gin.Context) {
 	}
 
 	if order.OrderType == models.OrderTypeBooking {
+		// Booking untuk kode becak tertentu hanya boleh diterima pemilik kode itu
+		if order.DriverID == nil && order.BecakCode != "" && !strings.EqualFold(order.BecakCode, driver.DriverCode) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Booking ini untuk becak lain"})
+			return
+		}
 		if order.ExpiresAt != nil && time.Now().After(*order.ExpiresAt) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Booking sudah kedaluwarsa"})
 			return
