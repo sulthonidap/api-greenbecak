@@ -197,6 +197,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 				payments.GET("/stats", handlers.GetPaymentStats)
 			}
 
+			// Ubah status order secara manual (Terima / Jemput / Selesai / Batal)
+			admin.PUT("/orders/:id/status", handlers.AdminUpdateOrderStatus)
+
 			// Booking: hotel mitra, destinasi populer, tarif per km
 			hotels := admin.Group("/hotels")
 			{

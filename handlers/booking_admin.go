@@ -1,16 +1,113 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"greenbecak-backend/database"
 	"greenbecak-backend/models"
 	"greenbecak-backend/services"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+// ===================== Ubah status order (admin) =====================
+
+type AdminOrderStatusRequest struct {
+	Status string `json:"status" binding:"required"` // accepted | picked_up | completed | cancelled
+	Reason string `json:"reason"`
+}
+
+// Status asal yang boleh untuk setiap status tujuan
+var adminStatusTransitions = map[models.OrderStatus][]models.OrderStatus{
+	models.OrderStatusAccepted:  {models.OrderStatusPending},
+	models.OrderStatusPickedUp:  {models.OrderStatusPending, models.OrderStatusAccepted},
+	models.OrderStatusCompleted: {models.OrderStatusPending, models.OrderStatusAccepted, models.OrderStatusPickedUp},
+	models.OrderStatusCancelled: {models.OrderStatusPending, models.OrderStatusAccepted, models.OrderStatusPickedUp},
+}
+
+// PUT /api/admin/orders/:id/status
+// Admin memajukan / membatalkan order secara manual (mis. becak belum terdaftar, atau driver
+// tidak memakai aplikasi). Driver pada order TIDAK diubah.
+func AdminUpdateOrderStatus(c *gin.Context) {
+	var req AdminOrderStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Status wajib diisi"})
+		return
+	}
+	target := models.OrderStatus(req.Status)
+	from, ok := adminStatusTransitions[target]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Status tidak dikenal"})
+		return
+	}
+
+	db := database.GetDB()
+	var order models.Order
+	if err := db.First(&order, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order tidak ditemukan"})
+		return
+	}
+
+	now := time.Now()
+	updates := map[string]interface{}{"status": target}
+	switch target {
+	case models.OrderStatusAccepted:
+		updates["accepted_at"] = now
+	case models.OrderStatusPickedUp:
+		updates["picked_up_at"] = now
+		if order.AcceptedAt == nil {
+			updates["accepted_at"] = now
+		}
+	case models.OrderStatusCompleted:
+		updates["completed_at"] = now
+		if order.OrderType == models.OrderTypeBooking {
+			updates["payment_status"] = "paid" // dibayar langsung ke driver di akhir perjalanan
+		}
+	case models.OrderStatusCancelled:
+		updates["cancelled_at"] = now
+		reason := "Dibatalkan admin"
+		if r := sanitizeSourceRef(req.Reason); r != "" {
+			reason = reason + ": " + r
+		}
+		updates["cancel_reason"] = reason
+	}
+
+	res := db.Model(&models.Order{}).Where("id = ? AND status IN ?", order.ID, from).Updates(updates)
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengubah status order"})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Status order sudah berubah, muat ulang halaman"})
+		return
+	}
+
+	// Sinkronkan data driver (kalau order punya driver terdaftar)
+	if order.DriverID != nil {
+		driverUpdates := map[string]interface{}{}
+		switch target {
+		case models.OrderStatusAccepted, models.OrderStatusPickedUp:
+			driverUpdates["status"] = models.DriverStatusOnTrip
+		case models.OrderStatusCompleted:
+			driverUpdates["status"] = models.DriverStatusActive
+			driverUpdates["total_trips"] = gorm.Expr("total_trips + 1")
+			driverUpdates["total_earnings"] = gorm.Expr("total_earnings + ?", order.Price)
+		case models.OrderStatusCancelled:
+			driverUpdates["status"] = models.DriverStatusActive
+			go notifyDriver(*order.DriverID, "Order dibatalkan", "Admin membatalkan order "+order.OrderNumber,
+				map[string]string{"type": "order_cancelled", "orderId": fmt.Sprintf("%d", order.ID)})
+		}
+		db.Model(&models.Driver{}).Where("id = ?", *order.DriverID).Updates(driverUpdates)
+	}
+
+	db.Preload("Driver").Preload("Tariff").Preload("Hotel").First(&order, order.ID)
+	c.JSON(http.StatusOK, gin.H{"message": "Status order diperbarui", "order": order})
+}
 
 // ===================== Hotel =====================
 
