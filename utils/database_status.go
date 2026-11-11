@@ -13,8 +13,11 @@ type DatabaseStatus struct {
 }
 
 var (
-	dbStatus      = DatabaseStatus{Connected: false, LastCheck: time.Now()}
-	lastDbCheck   = time.Now()
+	dbStatus = DatabaseStatus{Connected: false, LastCheck: time.Now()}
+	// Nilai nol supaya pengecekan pertama langsung dijalankan. Sebelumnya diisi time.Now(),
+	// sehingga 30 detik pertama setelah server menyala semua endpoint yang memakai
+	// CheckDatabaseAndRespond selalu menjawab 503 "Database connection issue".
+	lastDbCheck   time.Time
 	checkInterval = 30 * time.Second
 )
 
