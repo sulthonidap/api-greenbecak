@@ -142,6 +142,33 @@ func ReleaseBooking(c *gin.Context) {
 		return
 	}
 
+	var current models.Order
+	if err := db.First(&current, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	// Booking dengan kode becak dipilih penumpang khusus untuk driver ini:
+	// kalau driver tidak bisa, booking dibatalkan (tidak disiarkan ke driver lain).
+	if current.OrderType == models.OrderTypeBooking && current.BecakCode != "" {
+		now := time.Now()
+		res := db.Model(&models.Order{}).
+			Where("id = ? AND driver_id = ? AND status IN ?", current.ID, driver.ID,
+				[]models.OrderStatus{models.OrderStatusPending, models.OrderStatusAccepted}).
+			Updates(map[string]interface{}{
+				"status":        models.OrderStatusCancelled,
+				"cancelled_at":  now,
+				"cancel_reason": "Driver tidak dapat mengambil pesanan ini",
+			})
+		if res.Error != nil || res.RowsAffected == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Booking tidak bisa dilepas"})
+			return
+		}
+		db.Model(&driver).Update("status", models.DriverStatusActive)
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Booking %s dibatalkan", current.OrderNumber)})
+		return
+	}
+
 	expires := time.Now().Add(time.Duration(bookingExpiryMinutes()) * time.Minute)
 	res := db.Model(&models.Order{}).
 		Where("id = ? AND driver_id = ? AND status = ? AND order_type = ?",

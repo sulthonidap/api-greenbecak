@@ -154,7 +154,8 @@ func AcceptOrder(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Jenis kendaraan tidak sesuai dengan booking"})
 			return
 		}
-		if driverBusy(db, driver.ID, order.ID) {
+		// Booking dengan kode becak sudah dipilih penumpang untuk driver ini — tidak perlu cek sibuk
+		if order.DriverID == nil && driverBusy(db, driver.ID, order.ID) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Selesaikan order yang sedang berjalan terlebih dahulu"})
 			return
 		}
@@ -211,7 +212,9 @@ func CompleteOrder(c *gin.Context) {
 	}
 
 	allowed := []models.OrderStatus{models.OrderStatusAccepted, models.OrderStatusPickedUp}
-	if order.OrderType != models.OrderTypeBooking {
+	// Order langsung & booking dengan kode becak sudah milik driver ini sejak awal,
+	// jadi boleh langsung diselesaikan dari status pending.
+	if order.OrderType != models.OrderTypeBooking || order.BecakCode != "" {
 		allowed = append(allowed, models.OrderStatusPending)
 	}
 
