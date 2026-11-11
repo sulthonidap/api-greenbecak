@@ -1,14 +1,20 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
+	"time"
 
 	"greenbecak-backend/database"
 	"greenbecak-backend/models"
 	"greenbecak-backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type CreateUserRequest struct {
@@ -220,12 +226,65 @@ func DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
 	db := database.GetDB()
 
-	if err := db.Delete(&models.User{}, userID).Error; err != nil {
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Admin tidak boleh menghapus akunnya sendiri
+	if currentID, ok := c.Get("user_id"); ok {
+		if id, ok := currentID.(uint); ok && id == user.ID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tidak dapat menghapus akun Anda sendiri"})
+			return
+		}
+	}
+
+	// Soft delete user beserta data driver-nya. Kolom unik (username, email,
+	// driver_code) diberi akhiran supaya bisa dipakai lagi oleh akun baru,
+	// sementara riwayat order tetap merujuk ke ID lama.
+	suffix := fmt.Sprintf("__deleted_%d_%d", user.ID, time.Now().Unix())
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var driver models.Driver
+		if err := tx.Where("user_id = ?", user.ID).First(&driver).Error; err == nil {
+			if err := tx.Model(&driver).Update("driver_code", driver.DriverCode+suffix).Error; err != nil {
+				return err
+			}
+			if err := tx.Delete(&driver).Error; err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if err := tx.Model(&user).Updates(map[string]interface{}{
+			"username": user.Username + suffix,
+			"email":    user.Email + suffix,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&user).Error
+	})
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+// generateRandomPassword membuat password acak tanpa karakter yang mirip (0/O, 1/l/I).
+func generateRandomPassword(length int) (string, error) {
+	const charset = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, length)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		b[i] = charset[n.Int64()]
+	}
+	return string(b), nil
 }
 
 func ResetUserPassword(c *gin.Context) {
@@ -240,11 +299,16 @@ func ResetUserPassword(c *gin.Context) {
 		return
 	}
 
-	// Generate new password (default: password123)
-	newPassword := "password123"
+	// Generate random password (ditampilkan sekali ke admin)
+	var hashedPassword string
+	newPassword, err := generateRandomPassword(8)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate password"})
+		return
+	}
 
 	// Hash the new password
-	hashedPassword, err := utils.HashPassword(newPassword)
+	hashedPassword, err = utils.HashPassword(newPassword)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 		return
