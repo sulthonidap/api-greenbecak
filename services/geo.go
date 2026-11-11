@@ -92,6 +92,8 @@ type RouteResult struct {
 	DistanceKm  float64 `json:"distance_km"`
 	DurationMin float64 `json:"duration_min"`
 	Source      string  `json:"source"` // "route" atau "estimate"
+	// Jalur sepanjang jalan sebagai pasangan [lat, lng]. Kosong kalau Source = "estimate".
+	Geometry [][2]float64 `json:"geometry,omitempty"`
 }
 
 var routeCache = newTTLCache(30 * time.Minute)
@@ -115,7 +117,7 @@ func RouteDistance(lat1, lng1, lat2, lng2 float64) RouteResult {
 
 func osrmRoute(lat1, lng1, lat2, lng2 float64) (RouteResult, error) {
 	base := envOr("OSRM_URL", "https://routing.openstreetmap.de/routed-bike")
-	u := fmt.Sprintf("%s/route/v1/driving/%f,%f;%f,%f?overview=false", base, lng1, lat1, lng2, lat2)
+	u := fmt.Sprintf("%s/route/v1/driving/%f,%f;%f,%f?overview=full&geometries=geojson", base, lng1, lat1, lng2, lat2)
 
 	req, _ := http.NewRequest(http.MethodGet, u, nil)
 	req.Header.Set("User-Agent", geoUserAgent())
@@ -133,6 +135,9 @@ func osrmRoute(lat1, lng1, lat2, lng2 float64) (RouteResult, error) {
 		Routes []struct {
 			Distance float64 `json:"distance"` // meter
 			Duration float64 `json:"duration"` // detik
+			Geometry struct {
+				Coordinates [][]float64 `json:"coordinates"` // [lng, lat]
+			} `json:"geometry"`
 		} `json:"routes"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
@@ -141,13 +146,26 @@ func osrmRoute(lat1, lng1, lat2, lng2 float64) (RouteResult, error) {
 	if body.Code != "Ok" || len(body.Routes) == 0 {
 		return RouteResult{}, errors.New("osrm: no route")
 	}
-	km := body.Routes[0].Distance / 1000
+	r := body.Routes[0]
+	km := r.Distance / 1000
 	factor := 1.0
 	if v, err := strconv.ParseFloat(os.Getenv("OSRM_DURATION_FACTOR"), 64); err == nil && v > 0 {
 		factor = v
 	}
-	return RouteResult{DistanceKm: km, DurationMin: body.Routes[0].Duration / 60 * factor, Source: "route"}, nil
+
+	// Ubah ke [lat, lng] dan bulatkan 5 desimal (±1 m) supaya respons tetap kecil
+	geometry := make([][2]float64, 0, len(r.Geometry.Coordinates))
+	for _, c := range r.Geometry.Coordinates {
+		if len(c) < 2 {
+			continue
+		}
+		geometry = append(geometry, [2]float64{round5(c[1]), round5(c[0])})
+	}
+
+	return RouteResult{DistanceKm: km, DurationMin: r.Duration / 60 * factor, Source: "route", Geometry: geometry}, nil
 }
+
+func round5(v float64) float64 { return math.Round(v*1e5) / 1e5 }
 
 // ===== Pencarian alamat (Photon / OpenStreetMap) =====
 

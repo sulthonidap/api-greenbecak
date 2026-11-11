@@ -322,6 +322,8 @@ type BookingQuote struct {
 	PerKm          float64 `json:"per_km"`
 	MinFare        float64 `json:"min_fare"`
 	NearbyDrivers  int     `json:"nearby_drivers"`
+	// Jalur sepanjang jalan [[lat,lng], ...]; kosong kalau jarak hanya perkiraan
+	Route [][2]float64 `json:"route,omitempty"`
 }
 
 type quoteError struct {
@@ -372,6 +374,7 @@ func computeQuote(db *gorm.DB, req BookingQuoteRequest) (*BookingQuote, *models.
 		PerKm:          rate.PerKm,
 		MinFare:        rate.MinFare,
 		NearbyDrivers:  len(nearby),
+		Route:          route.Geometry,
 	}, &rate, nil
 }
 
@@ -517,7 +520,10 @@ func CreateBooking(c *gin.Context) {
 		respondQuoteError(c, err)
 		return
 	}
+	routeGeometry := quote.Route
+	quote.Route = nil // tidak perlu dikirim ulang di respons booking
 	if req.ExpectedPrice != nil && math.Abs(*req.ExpectedPrice-quote.Price) >= 1 {
+		quote.Route = routeGeometry
 		c.JSON(http.StatusConflict, gin.H{
 			"error": "Harga berubah, silakan cek kembali sebelum memesan",
 			"quote": quote,
@@ -648,7 +654,8 @@ func findBookingByToken(db *gorm.DB, token string) (*models.Order, error) {
 	return &order, nil
 }
 
-// GET /api/booking/status/:token
+// GET /api/booking/status/:token[?route=1]
+// route=1 menyertakan jalur jemput → tujuan (cukup diminta sekali, bukan setiap polling).
 func GetBookingStatus(c *gin.Context) {
 	db := database.GetDB()
 	order, err := findBookingByToken(db, c.Param("token"))
@@ -656,7 +663,14 @@ func GetBookingStatus(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"booking": bookingStatusView(db, *order)})
+	view := bookingStatusView(db, *order)
+	if c.Query("route") == "1" && order.PickupLat != nil && order.PickupLng != nil && order.DropLat != nil && order.DropLng != nil {
+		r := services.RouteDistance(*order.PickupLat, *order.PickupLng, *order.DropLat, *order.DropLng)
+		if len(r.Geometry) > 0 {
+			view["route"] = r.Geometry
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"booking": view})
 }
 
 // POST /api/booking/status/:token/cancel
