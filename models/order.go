@@ -15,15 +15,28 @@ const (
 	OrderStatusCancelled OrderStatus = "cancelled"
 )
 
+const (
+	OrderTypeScan   = "scan"   // Customer sudah di becak, scan QR / isi kode becak
+	OrderTypeJemput = "jemput" // Customer pesan dari lokasinya, pengayuh menjemput
+)
+
 type Order struct {
 	ID             uint           `json:"id" gorm:"primaryKey"`
 	OrderNumber    string         `json:"order_number" gorm:"unique;not null"`
 	CustomerID     *uint          `json:"customer_id"`
 	DriverID       *uint          `json:"driver_id"`
-	BecakCode      string         `json:"becak_code" gorm:"not null"` // Kode dari sticker barcode
-	TariffID       uint           `json:"tariff_id"`
-	PickupLocation string         `json:"pickup_location"` // Bisa null, diisi nanti oleh sistem
-	DropLocation   string         `json:"drop_location"`   // Bisa null, diisi nanti oleh sistem
+	BecakCode      string         `json:"becak_code" gorm:"not null"`                     // Kode dari sticker barcode
+	TariffID       *uint          `json:"tariff_id"`                                      // Null untuk order jemput (harga per-km)
+	PickupLocation string         `json:"pickup_location"`                                // Bisa null, diisi nanti oleh sistem
+	DropLocation   string         `json:"drop_location"`                                  // Bisa null, diisi nanti oleh sistem
+	OrderType      string         `json:"order_type" gorm:"size:16;default:'scan';index"` // scan | jemput
+	PickupLat      *float64       `json:"pickup_lat"`
+	PickupLng      *float64       `json:"pickup_lng"`
+	DropLat        *float64       `json:"drop_lat"`
+	DropLng        *float64       `json:"drop_lng"`
+	PickupNote     string         `json:"pickup_note"`                   // Patokan jemput, mis. "lobby, kamar 203"
+	DurationMin    int            `json:"duration_min" gorm:"default:0"` // Estimasi durasi rute (menit)
+	TrackingToken  *string        `json:"-" gorm:"size:32;uniqueIndex"`  // Token publik untuk halaman lacak pesanan
 	Distance       float64        `json:"distance" gorm:"not null"`
 	Price          float64        `json:"price" gorm:"not null"`
 	ETA            int            `json:"eta" gorm:"-"` // Estimated Time of Arrival in minutes (calculated field)

@@ -36,8 +36,23 @@ func GetDriverOrders(c *gin.Context) {
 		return
 	}
 
+	// Order jemput yang belum diambil pengayuh mana pun ikut ditampilkan sebagai "pending",
+	// supaya pengayuh aktif bisa menerimanya dari dashboard.
+	status := c.Query("status")
+	if driver.Status == models.DriverStatusActive && (status == "" || status == string(models.OrderStatusPending)) {
+		var available []models.Order
+		if err := db.Where("order_type = ? AND status = ? AND driver_id IS NULL AND created_at > ?",
+			models.OrderTypeJemput, models.OrderStatusPending, time.Now().Add(-availablePickupWindow)).
+			Order("created_at ASC").Find(&available).Error; err == nil && len(available) > 0 {
+			orders = append(available, orders...)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
+
+// Order jemput yang lebih lama dari ini tidak lagi ditawarkan ke pengayuh.
+const availablePickupWindow = 3 * time.Hour
 
 // GetAvailableOrders - Get orders that are available for drivers to accept (pending orders without driver)
 func GetAvailableOrders(c *gin.Context) {
@@ -149,19 +164,35 @@ func AcceptOrder(c *gin.Context) {
 		return
 	}
 
-	// Update order
+	// Order milik pengayuh lain tidak boleh diambil
+	if order.DriverID != nil && *order.DriverID != driver.ID {
+		c.JSON(http.StatusConflict, gin.H{"error": "Order sudah diambil pengayuh lain"})
+		return
+	}
+
+	// Update order secara atomik supaya dua pengayuh tidak bisa menerima order yang sama
 	now := time.Now()
+	res := db.Model(&models.Order{}).
+		Where("id = ? AND status = ? AND (driver_id IS NULL OR driver_id = ?)", order.ID, models.OrderStatusPending, driver.ID).
+		Updates(map[string]interface{}{
+			"status":      models.OrderStatusAccepted,
+			"driver_id":   driver.ID,
+			"accepted_at": now,
+		})
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept order"})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Order sudah diambil pengayuh lain"})
+		return
+	}
 	order.Status = models.OrderStatusAccepted
 	order.DriverID = &driver.ID
 	order.AcceptedAt = &now
 
 	// Update driver status
 	driver.Status = models.DriverStatusOnTrip
-
-	if err := db.Save(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept order"})
-		return
-	}
 
 	if err := db.Save(&driver).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update driver status"})
@@ -254,8 +285,6 @@ func GetDriverEarnings(c *gin.Context) {
 	var totalEarnings sql.NullFloat64
 	db.Model(&models.Order{}).Where("driver_id = ? AND status = ?", driver.ID, models.OrderStatusCompleted).Select("SUM(price)").Scan(&totalEarnings)
 
-
-
 	// Get today's earnings and trips
 	today := time.Now().Format("2006-01-02")
 	var todayEarnings sql.NullFloat64
@@ -284,7 +313,7 @@ func GetDriverEarnings(c *gin.Context) {
 			driver.ID, models.OrderStatusCompleted, currentMonth).
 		Count(&monthlyTrips)
 
-		earnings := gin.H{
+	earnings := gin.H{
 		"driver_id":   driver.ID,
 		"driver_name": driver.Name,
 		"total_earnings": func() float64 {

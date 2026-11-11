@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"greenbecak-backend/handlers"
 	"greenbecak-backend/middleware"
 
@@ -50,6 +52,13 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		api.POST("/orders/public", handlers.CreateOrderPublic)
 		api.POST("/orders/public/:id/pay", handlers.ConfirmOrderPaymentPublic)
 		api.GET("/orders/history", handlers.GetOrderHistory)
+
+		// Order jemput (customer pesan dari lokasinya, harga per-km)
+		api.GET("/pricing/public", handlers.GetPricingSettingsPublic)
+		api.POST("/orders/pickup/quote", middleware.NewRateLimiter(60, time.Minute).RateLimit(), handlers.QuotePickupOrder)
+		api.POST("/orders/pickup", middleware.NewRateLimiter(10, time.Minute).RateLimit(), handlers.CreatePickupOrder)
+		api.GET("/orders/pickup/:token", handlers.TrackPickupOrder)
+		api.POST("/orders/pickup/:token/cancel", handlers.CancelPickupOrder)
 
 		// Public admin creation endpoint (no auth required)
 		api.POST("/admin/public", handlers.CreateAdminPublic)
@@ -154,6 +163,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 				tariffs.PUT("/:id/active", handlers.ToggleTariffActive)
 				tariffs.DELETE("/:id", handlers.DeleteTariff)
 			}
+
+			// Pengaturan tarif per-km (order jemput)
+			admin.GET("/pricing", handlers.GetPricingSettings)
+			admin.PUT("/pricing", handlers.UpdatePricingSettings)
 
 			// Analytics
 			admin.GET("/analytics", handlers.GetAnalytics)

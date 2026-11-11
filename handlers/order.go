@@ -44,7 +44,8 @@ type UpdateOrderLocationRequest struct {
 
 // generateOrderNumber creates a unique order number
 func generateOrderNumber() string {
-	return fmt.Sprintf("ORD-%d", time.Now().Unix())
+	// Suffix acak supaya dua order di detik yang sama tidak bentrok (order_number unique)
+	return fmt.Sprintf("ORD-%d-%s", time.Now().Unix(), randomHex(2))
 }
 
 func CreateOrder(c *gin.Context) {
@@ -76,7 +77,8 @@ func CreateOrder(c *gin.Context) {
 		order := models.Order{
 			OrderNumber:    generateOrderNumber(),
 			CustomerID:     &req.CustomerID,
-			TariffID:       req.TariffID,
+			TariffID:       &req.TariffID,
+			OrderType:      models.OrderTypeScan,
 			PickupLocation: req.PickupLocation,
 			DropLocation:   req.DropLocation,
 			Distance:       req.Distance,
@@ -140,7 +142,8 @@ func CreateOrderPublic(c *gin.Context) {
 		OrderNumber:    generateOrderNumber(),
 		BecakCode:      req.BecakCode,
 		DriverID:       driverID,
-		TariffID:       req.TariffID,
+		TariffID:       &req.TariffID,
+		OrderType:      models.OrderTypeScan,
 		PickupLocation: "", // Akan diisi nanti oleh sistem/driver
 		DropLocation:   "", // Akan diisi nanti oleh sistem/driver
 		Distance:       distance,

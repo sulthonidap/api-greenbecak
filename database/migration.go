@@ -21,6 +21,7 @@ func RunMigrations(db *gorm.DB) error {
 		&models.Payment{},
 		&models.Withdrawal{},
 		&models.DriverLocation{},
+		&models.PricingSetting{},
 	)
 
 	if err != nil {
