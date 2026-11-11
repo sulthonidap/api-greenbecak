@@ -530,7 +530,7 @@ type CreateBookingRequest struct {
 	Drop          GeoPoint `json:"drop" binding:"required"`
 	VehicleType   string   `json:"vehicle_type"`
 	CustomerName  string   `json:"customer_name" binding:"required"`
-	CustomerPhone string   `json:"customer_phone" binding:"required"`
+	CustomerPhone string   `json:"customer_phone"` // opsional
 	Notes         string   `json:"notes"`
 	Source        string   `json:"source"`
 	SourceRef     string   `json:"source_ref"`
@@ -547,7 +547,7 @@ type CreateBookingRequest struct {
 func CreateBooking(c *gin.Context) {
 	var req CreateBookingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Data booking belum lengkap: titik jemput, tujuan, nama, dan nomor WA wajib diisi"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Data booking belum lengkap: titik jemput, tujuan, dan nama wajib diisi"})
 		return
 	}
 
@@ -556,10 +556,15 @@ func CreateBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nama tidak valid"})
 		return
 	}
-	phone, ok := normalizePhone(req.CustomerPhone)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor WhatsApp tidak valid"})
-		return
+	// Nomor HP opsional; kalau diisi harus valid
+	phone := ""
+	if strings.TrimSpace(req.CustomerPhone) != "" {
+		p, ok := normalizePhone(req.CustomerPhone)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor WhatsApp tidak valid"})
+			return
+		}
+		phone = p
 	}
 	notes := strings.TrimSpace(req.Notes)
 	if len([]rune(notes)) > 300 {
@@ -568,15 +573,17 @@ func CreateBooking(c *gin.Context) {
 
 	db := database.GetDB()
 
-	// Anti-spam: batasi booking aktif per nomor
-	var active int64
-	db.Model(&models.Order{}).
-		Where("customer_phone = ? AND order_type = ? AND status IN ?", phone, models.OrderTypeBooking,
-			[]models.OrderStatus{models.OrderStatusPending, models.OrderStatusAccepted, models.OrderStatusPickedUp}).
-		Count(&active)
-	if int(active) >= maxActiveBookingsPerPhone() {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Nomor ini masih punya booking yang aktif. Selesaikan atau batalkan dulu."})
-		return
+	// Anti-spam per nomor (hanya kalau nomor diisi; pembatas per IP tetap berlaku di route)
+	if phone != "" {
+		var active int64
+		db.Model(&models.Order{}).
+			Where("customer_phone = ? AND order_type = ? AND status IN ?", phone, models.OrderTypeBooking,
+				[]models.OrderStatus{models.OrderStatusPending, models.OrderStatusAccepted, models.OrderStatusPickedUp}).
+			Count(&active)
+		if int(active) >= maxActiveBookingsPerPhone() {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Nomor ini masih punya booking yang aktif. Selesaikan atau batalkan dulu."})
+			return
+		}
 	}
 
 	// Asal order
