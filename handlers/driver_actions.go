@@ -44,6 +44,10 @@ func GetDriverOrders(c *gin.Context) {
 		if err := db.Where("order_type = ? AND status = ? AND driver_id IS NULL AND created_at > ?",
 			models.OrderTypeJemput, models.OrderStatusPending, time.Now().Add(-availablePickupWindow)).
 			Order("created_at ASC").Find(&available).Error; err == nil && len(available) > 0 {
+			// Nomor pelanggan baru dibuka setelah pesanan diterima
+			for i := range available {
+				available[i].CustomerPhone = ""
+			}
 			orders = append(available, orders...)
 		}
 	}
